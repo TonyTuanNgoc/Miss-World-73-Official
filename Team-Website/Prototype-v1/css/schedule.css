@@ -1,0 +1,358 @@
+/* ============================================================
+   SCHEDULE PAGE — schedule.css
+   Extends style.css
+============================================================ */
+
+/* ============================================================
+   PAGE HEADER
+============================================================ */
+.page-header {
+  background: var(--hero-bg);
+  padding: 180px 0 80px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.page-header::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 75% 25%, rgba(0,56,118,0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 25% 75%, rgba(201,168,76,0.07) 0%, transparent 45%);
+  pointer-events: none;
+}
+
+.page-header .section-label { color: var(--gold); }
+
+.page-header__title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(48px, 7vw, 92px);
+  font-weight: 700;
+  color: var(--white);
+  line-height: 1.0;
+  margin: 16px 0 28px;
+  position: relative;
+  z-index: 1;
+}
+.page-header__title em {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.page-header__desc {
+  font-size: 15.5px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.42);
+  line-height: 1.82;
+  max-width: 560px;
+  letter-spacing: 0.015em;
+  margin-bottom: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Legend keys */
+.header-keys {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+.key-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.42);
+  letter-spacing: 0.04em;
+}
+.key-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.key-dot--cultural  { background: #4ade80; }
+.key-dot--competition { background: var(--blue-mid); }
+.key-dot--finale   { background: var(--gold); }
+.key-dot--team     { background: rgba(255,255,255,0.3); }
+
+/* ============================================================
+   KEY MILESTONES
+============================================================ */
+.milestones-section {
+  background: var(--light);
+  color: var(--dark);
+  padding: var(--section-y) 0;
+}
+
+.milestones-header {
+  margin-bottom: 52px;
+}
+
+.milestones-heading {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(28px, 3.4vw, 46px);
+  font-weight: 600;
+  color: var(--dark);
+  margin-top: 8px;
+}
+
+.milestones-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+}
+
+.milestone {
+  background: var(--white);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-top: 3px solid rgba(0,0,0,0.07);
+  transition: border-color 0.25s ease;
+}
+.milestone:hover {
+  border-top-color: var(--blue);
+}
+
+.milestone__date {
+  display: flex;
+  flex-direction: column;
+}
+.milestone__day {
+  font-family: 'Playfair Display', serif;
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--blue);
+  line-height: 1;
+}
+.milestone__month {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.milestone__title {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--dark);
+  line-height: 1.2;
+}
+
+.milestone__desc {
+  font-size: 13px;
+  color: var(--mid);
+  line-height: 1.7;
+}
+
+.finale-date .milestone__day,
+.finale-date .milestone__day {
+  color: var(--gold);
+}
+
+/* ============================================================
+   FULL SCHEDULE
+============================================================ */
+.schedule-section {
+  background: var(--dark);
+  padding: var(--section-y) 0;
+}
+
+.schedule-header {
+  margin-bottom: 52px;
+}
+.schedule-header .section-label { color: var(--gold); }
+
+.schedule-heading {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(28px, 3.4vw, 46px);
+  font-weight: 600;
+  color: var(--white);
+  margin-top: 8px;
+}
+
+/* ── Phase dividers ────────────────────────────────────── */
+.phase {
+  padding: 44px 0 28px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 44px;
+}
+.phase:first-of-type {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+.phase__label {
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(201,168,76,0.6);
+  margin-bottom: 8px;
+}
+
+.phase__title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(22px, 2.5vw, 32px);
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 6px;
+}
+
+.phase__range {
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.06em;
+}
+
+.phase--finale .phase__title {
+  color: var(--gold);
+}
+
+/* ── Event rows ────────────────────────────────────────── */
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.event-row {
+  display: grid;
+  grid-template-columns: 64px 4px 1fr auto;
+  gap: 0 24px;
+  align-items: start;
+  background: #111827;
+  padding: 24px 32px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.event-row:hover {
+  background: #151f30;
+  border-color: rgba(201,168,76,0.08);
+}
+
+.event-row--highlight {
+  background: rgba(0,56,118,0.15);
+  border-color: rgba(0,91,187,0.18) !important;
+}
+
+.event-row--finale {
+  background: rgba(201,168,76,0.06);
+  border-color: rgba(201,168,76,0.2) !important;
+}
+
+.event-row__date {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+.event-row__day {
+  font-family: 'Playfair Display', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.55);
+  line-height: 1;
+}
+.event-row__month {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.22);
+  margin-top: 2px;
+}
+
+/* Type indicator dot column */
+.event-row__type {
+  width: 4px;
+  height: 100%;
+  min-height: 36px;
+  align-self: stretch;
+  border-radius: 2px;
+}
+.event-row__type--cultural   { background: rgba(74,222,128,0.5); }
+.event-row__type--competition { background: rgba(0,91,187,0.6); }
+.event-row__type--finale      { background: rgba(201,168,76,0.7); }
+.event-row__type--team        { background: rgba(255,255,255,0.15); }
+
+.event-row__body {
+  padding: 0;
+}
+
+.event-row__title {
+  font-family: 'Playfair Display', serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+.event-row--finale .event-row__title {
+  color: var(--gold);
+  font-size: 20px;
+}
+
+.event-row__detail {
+  font-size: 13px;
+  color: rgba(255,255,255,0.38);
+  line-height: 1.72;
+}
+
+.event-row__meta {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  min-width: 140px;
+  padding-top: 2px;
+}
+.event-row__time {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.event-row__loc {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.22);
+  white-space: nowrap;
+}
+
+.finale-time {
+  color: var(--gold) !important;
+  font-size: 16px !important;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width: 1024px) {
+  .milestones-row { grid-template-columns: repeat(2, 1fr); }
+  .event-row { grid-template-columns: 56px 4px 1fr; }
+  .event-row__meta { display: none; }
+}
+
+@media (max-width: 768px) {
+  .page-header { padding: 140px 0 56px; }
+  .header-keys { gap: 16px; }
+  .milestones-row { grid-template-columns: 1fr; }
+  .event-row { padding: 18px 20px; gap: 0 16px; }
+  .event-row__day { font-size: 18px; }
+  .event-row__title { font-size: 15px; }
+}

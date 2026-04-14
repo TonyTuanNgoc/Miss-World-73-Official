@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Locations & Experiences — Miss World 73 Vietnam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="Team-Website/Prototype-v1/css/style.css" />
+  <link rel="stylesheet" href="Team-Website/Prototype-v1/css/locations.css" />
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__logo">
+        <span class="nav__logo-mark">MW</span>
+        <span class="nav__logo-divider">·</span>
+        <span class="nav__logo-text">73 Vietnam</span>
+      </a>
+      <ul class="nav__links">
+        <li><a href="contestants.html">Contestants</a></li>
+        <li><a href="locations.html" style="color:var(--white)">Locations</a></li>
+        <li><a href="schedule.html">Schedule</a></li>
+        <li><a href="#" class="nav__badge">Nội bộ</a></li>
+      </ul>
+      <button class="nav__hamburger" id="nav-hamburger" aria-label="Mở menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Drawer -->
+  <div class="nav__drawer" id="nav-drawer">
+    <ul>
+      <li><a href="index.html"><span class="nav__drawer-title">Home</span><span class="nav__drawer-sub">Miss World 73 Vietnam</span></a></li>
+      <li><a href="presenter-team.html"><span class="nav__drawer-title">Connection Team</span><span class="nav__drawer-sub">Nhóm kết nối</span></a></li>
+      <li><a href="contestants.html"><span class="nav__drawer-title">Contestants</span><span class="nav__drawer-sub">Thí sinh &amp; Quốc gia</span></a></li>
+      <li><a href="locations.html"><span class="nav__drawer-title">Locations</span><span class="nav__drawer-sub">Địa điểm &amp; Văn hóa</span></a></li>
+      <li><a href="interview-prep.html"><span class="nav__drawer-title">Interview Prep</span><span class="nav__drawer-sub">Chuẩn bị phỏng vấn</span></a></li>
+      <li><a href="media-social.html"><span class="nav__drawer-title">Media &amp; Social</span><span class="nav__drawer-sub">Truyền thông</span></a></li>
+      <li><a href="schedule.html"><span class="nav__drawer-title">Schedule</span><span class="nav__drawer-sub">Lịch trình sự kiện</span></a></li>
+    </ul>
+  </div>
+
+  <!-- Page Header -->
+  <section class="page-header">
+    <div class="container">
+      <div class="section-label">Miss World 73 · Vietnam · Internal</div>
+      <h1 class="page-header__title">Locations &amp; Experiences</h1>
+      <p class="page-header__desc">Explore the iconic locations across Vietnam where Miss World contestants will discover culture, history, and local life. These places provide the perfect setting for meaningful conversations, cultural storytelling, and memorable experiences.</p>
+    </div>
+  </section>
+
+  <!-- Locations Grid -->
+  <section class="locations-section">
+    <div class="container">
+      <div class="locations-grid" id="locations-grid"></div>
+    </div>
+  </section>
+
+  <!-- Location Detail Modal -->
+  <div class="loc-modal" id="loc-modal" aria-hidden="true">
+    <div class="loc-modal__overlay" id="modal-overlay"></div>
+    <div class="loc-modal__panel" id="modal-panel" role="dialog" aria-modal="true">
+      <div class="loc-modal__topbar">
+        <div class="loc-modal__breadcrumb" id="modal-breadcrumb"></div>
+        <button class="loc-modal__close" id="modal-close" aria-label="Close location">
+          <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="loc-modal__content" id="modal-content"></div>
+    </div>
+  </div>
+
+  <script src="Team-Website/Prototype-v1/js/main.js"></script>
+  <script src="Team-Website/Prototype-v1/js/locations.js"></script>
+</body>
+</html>

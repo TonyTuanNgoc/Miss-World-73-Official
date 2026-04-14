@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Media & Social — Miss World 73 Vietnam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="Team-Website/Prototype-v1/css/style.css" />
+  <link rel="stylesheet" href="Team-Website/Prototype-v1/css/media-social.css" />
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <div class="nav__inner">
+      <a href="index.html" class="nav__logo">
+        <span class="nav__logo-mark">MW</span>
+        <span class="nav__logo-divider">·</span>
+        <span class="nav__logo-text">73 Vietnam</span>
+      </a>
+      <ul class="nav__links">
+        <li><a href="contestants.html">Contestants</a></li>
+        <li><a href="locations.html">Locations</a></li>
+        <li><a href="schedule.html">Schedule</a></li>
+        <li><a href="#" class="nav__badge">Nội bộ</a></li>
+      </ul>
+      <button class="nav__hamburger" id="nav-hamburger" aria-label="Mở menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Drawer -->
+  <div class="nav__drawer" id="nav-drawer">
+    <ul>
+      <li><a href="index.html"><span class="nav__drawer-title">Home</span><span class="nav__drawer-sub">Miss World 73 Vietnam</span></a></li>
+      <li><a href="presenter-team.html"><span class="nav__drawer-title">Connection Team</span><span class="nav__drawer-sub">Nhóm kết nối</span></a></li>
+      <li><a href="contestants.html"><span class="nav__drawer-title">Contestants</span><span class="nav__drawer-sub">Thí sinh &amp; Quốc gia</span></a></li>
+      <li><a href="locations.html"><span class="nav__drawer-title">Locations</span><span class="nav__drawer-sub">Địa điểm &amp; Văn hóa</span></a></li>
+      <li><a href="interview-prep.html"><span class="nav__drawer-title">Interview Prep</span><span class="nav__drawer-sub">Chuẩn bị phỏng vấn</span></a></li>
+      <li><a href="media-social.html"><span class="nav__drawer-title">Media &amp; Social</span><span class="nav__drawer-sub">Truyền thông</span></a></li>
+      <li><a href="schedule.html"><span class="nav__drawer-title">Schedule</span><span class="nav__drawer-sub">Lịch trình sự kiện</span></a></li>
+    </ul>
+  </div>
+
+  <!-- Page Header -->
+  <section class="page-header">
+    <div class="container">
+      <div class="section-label">Miss World 73 · Vietnam · Internal</div>
+      <h1 class="page-header__title">Media &amp;<br><em>Social.</em></h1>
+      <p class="page-header__desc">Trung tâm điều phối truyền thông và mạng xã hội — lịch nội dung, hướng dẫn từng platform, chiến lược hashtag, và thông tin liên hệ báo chí.</p>
+    </div>
+  </section>
+
+  <!-- Platforms -->
+  <section class="platforms-section">
+    <div class="container">
+      <div class="platforms-header reveal">
+        <div class="section-label" style="color:var(--blue)">4 Nền tảng chính</div>
+        <h2 class="platforms-heading">Mỗi platform, một chiến lược.</h2>
+      </div>
+      <div class="platforms-grid">
+
+        <div class="platform-card reveal" data-platform="instagram">
+          <div class="platform-card__top">
+            <div class="platform-card__icon platform-card__icon--ig">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+                <rect x="2" y="2" width="20" height="20" rx="5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="platform-card__name">Instagram</h3>
+              <div class="platform-card__handle">@missworld73vn</div>
+            </div>
+          </div>
+          <div class="platform-card__stats">
+            <div class="pstat"><span class="pstat__val">3–5</span><span class="pstat__label">posts/ngày</span></div>
+            <div class="pstat"><span class="pstat__val">8–10</span><span class="pstat__label">Stories/ngày</span></div>
+            <div class="pstat"><span class="pstat__val">Reels</span><span class="pstat__label">Ưu tiên</span></div>
+          </div>
+          <ul class="platform-card__tips">
+            <li>Reels ngắn (15–30s) từ phỏng vấn và hành trình văn hóa — đây là định dạng được đẩy nhiều nhất</li>
+            <li>Carousel 5–10 ảnh cho cultural deep-dives theo quốc gia</li>
+            <li>Stories: real-time behind-the-scenes, polls với khán giả</li>
+            <li>Caption: song ngữ Anh–Việt, giọng ấm, không quá formal</li>
+          </ul>
+          <div class="platform-card__note">
+            Giờ vàng đăng bài: 7h–9h sáng, 12h trưa, 7h–9h tối (giờ Hà Nội)
+          </div>
+        </div>
+
+        <div class="platform-card reveal" data-platform="tiktok">
+          <div class="platform-card__top">
+            <div class="platform-card__icon platform-card__icon--tt">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="platform-card__name">TikTok</h3>
+              <div class="platform-card__handle">@missworld73vn</div>
+            </div>
+          </div>
+          <div class="platform-card__stats">
+            <div class="pstat"><span class="pstat__val">5–8</span><span class="pstat__label">videos/ngày</span></div>
+            <div class="pstat"><span class="pstat__val">15–60s</span><span class="pstat__label">Độ dài lý tưởng</span></div>
+            <div class="pstat"><span class="pstat__val">LIVE</span><span class="pstat__label">Sự kiện lớn</span></div>
+          </div>
+          <ul class="platform-card__tips">
+            <li>Authentic, không dàn dựng quá — khán giả TikTok cảm nhận được sự giả tạo</li>
+            <li>Phản ứng thí sinh với văn hóa Việt Nam: ăn phở, mặc áo dài, học câu tiếng Việt</li>
+            <li>Series: "Contestant of the Day" — 60s giới thiệu 1 thí sinh mỗi ngày</li>
+            <li>Âm nhạc: Ưu tiên nhạc Việt trending + nhạc chủ đề chính thức của chương trình</li>
+          </ul>
+          <div class="platform-card__note">
+            Hook trong 2 giây đầu — đây là yếu tố quyết định video có được xem tiếp không
+          </div>
+        </div>
+
+        <div class="platform-card reveal" data-platform="facebook">
+          <div class="platform-card__top">
+            <div class="platform-card__icon platform-card__icon--fb">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3V2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="platform-card__name">Facebook</h3>
+              <div class="platform-card__handle">Miss World 73 Vietnam Official</div>
+            </div>
+          </div>
+          <div class="platform-card__stats">
+            <div class="pstat"><span class="pstat__val">4–6</span><span class="pstat__label">posts/ngày</span></div>
+            <div class="pstat"><span class="pstat__val">LIVE</span><span class="pstat__label">Mọi sự kiện lớn</span></div>
+            <div class="pstat"><span class="pstat__val">Album</span><span class="pstat__label">Ảnh chất lượng cao</span></div>
+          </div>
+          <ul class="platform-card__tips">
+            <li>Đối tượng chính: 25–45 tuổi, Việt kiều, khán giả theo dõi lâu năm</li>
+            <li>LIVE bắt buộc: Lễ khai mạc, Talent Show, Semi-Final, Grand Final</li>
+            <li>Album ảnh editorial sau mỗi sự kiện — chất lượng cao, caption kỹ</li>
+            <li>Chia sẻ nội dung dạng bài viết dài hơn — thông tin chi tiết về thí sinh</li>
+          </ul>
+          <div class="platform-card__note">
+            Facebook phù hợp cho nội dung sâu và phân tích — không cần ngắn và nhanh như TikTok
+          </div>
+        </div>
+
+        <div class="platform-card reveal" data-platform="youtube">
+          <div class="platform-card__top">
+            <div class="platform-card__icon platform-card__icon--yt">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.96-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" stroke="currentColor" stroke-width="1.5"/>
+                <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="platform-card__name">YouTube</h3>
+              <div class="platform-card__handle">Miss World 73 Vietnam</div>
+            </div>
+          </div>
+          <div class="platform-card__stats">
+            <div class="pstat"><span class="pstat__val">1–2</span><span class="pstat__label">videos/ngày</span></div>
+            <div class="pstat"><span class="pstat__val">5–15p</span><span class="pstat__label">Độ dài lý tưởng</span></div>
+            <div class="pstat"><span class="pstat__val">LIVE</span><span class="pstat__label">Grand Final</span></div>
+          </div>
+          <ul class="platform-card__tips">
+            <li>Series: "A Day With Miss [Country]" — mini-documentary 8–12 phút theo một thí sinh</li>
+            <li>Weekly recap: Tuần của Miss World 73 — tổng hợp highlight mỗi tuần</li>
+            <li>Phỏng vấn chuyên sâu 1:1 với thí sinh được chú ý nhất</li>
+            <li>SEO tiêu đề: Gồm tên thí sinh, tên quốc gia, Miss World 2026 trong mỗi video</li>
+          </ul>
+          <div class="platform-card__note">
+            YouTube là nơi lưu trữ vĩnh viễn — đầu tư vào thumbnail và chất lượng âm thanh
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Hashtag Strategy -->
+  <section class="hashtag-section">
+    <div class="container">
+      <div class="hashtag-header reveal">
+        <div class="section-label">Chiến lược Hashtag</div>
+        <h2 class="hashtag-heading">Hashtag chính thức<br>và cách dùng.</h2>
+      </div>
+      <div class="hashtag-grid">
+
+        <div class="ht-group reveal">
+          <h3 class="ht-group__label">Primary — Dùng trong mọi bài đăng</h3>
+          <div class="ht-tags">
+            <span class="ht-tag ht-tag--primary">#MissWorld73</span>
+            <span class="ht-tag ht-tag--primary">#MissWorld2026</span>
+            <span class="ht-tag ht-tag--primary">#MissWorldVietnam</span>
+          </div>
+        </div>
+
+        <div class="ht-group reveal">
+          <h3 class="ht-group__label">Vietnamese — Cho nội dung Việt ngữ</h3>
+          <div class="ht-tags">
+            <span class="ht-tag ht-tag--vi">#MissWorld73VietNam</span>
+            <span class="ht-tag ht-tag--vi">#HoaHậuThếGiới73</span>
+            <span class="ht-tag ht-tag--vi">#VietNamChaoThanhThiSinh</span>
+            <span class="ht-tag ht-tag--vi">#MissWorldTaiVN</span>
+          </div>
+        </div>
+
+        <div class="ht-group reveal">
+          <h3 class="ht-group__label">Cultural — Cho nội dung văn hóa &amp; địa điểm</h3>
+          <div class="ht-tags">
+            <span class="ht-tag">#VietnamCulture</span>
+            <span class="ht-tag">#VisitVietnam</span>
+            <span class="ht-tag">#HoiAn</span>
+            <span class="ht-tag">#HaLongBay</span>
+            <span class="ht-tag">#HanoisCulture</span>
+            <span class="ht-tag">#VietnamBeauty</span>
+          </div>
+        </div>
+
+        <div class="ht-group reveal">
+          <h3 class="ht-group__label">Event-specific — Theo từng sự kiện</h3>
+          <div class="ht-tags">
+            <span class="ht-tag">#BWAP2026</span>
+            <span class="ht-tag">#MissWorldTalent</span>
+            <span class="ht-tag">#MissWorldGrandFinal</span>
+            <span class="ht-tag">#MissWorldCrown</span>
+          </div>
+        </div>
+
+      </div>
+      <div class="hashtag-note reveal">
+        <span class="note-badge">Quy tắc</span>
+        Mỗi bài đăng: 3–5 hashtag tối đa. Nhiều hơn làm giảm reach thuật toán. Hashtag primary + 1–2 specific là công thức chuẩn.
+      </div>
+    </div>
+  </section>
+
+  <!-- Content Calendar -->
+  <section class="calendar-section">
+    <div class="container">
+      <div class="calendar-header reveal">
+        <div class="section-label" style="color:var(--blue)">Lịch nội dung</div>
+        <h2 class="calendar-heading">Mốc nội dung<br>quan trọng.</h2>
+        <p class="calendar-sub">Lịch tổng quan — lịch chi tiết theo ngày sẽ được cập nhật trong mục Schedule.</p>
+      </div>
+      <div class="calendar-timeline">
+
+        <div class="cal-item reveal">
+          <div class="cal-item__phase">Giai đoạn 1</div>
+          <div class="cal-item__date">Tháng 6 – 7/2026</div>
+          <h3 class="cal-item__title">Pre-Event Build-up</h3>
+          <ul class="cal-item__list">
+            <li>Countdown posts — đếm ngược đến ngày khai mạc</li>
+            <li>Teaser về địa điểm và hành trình văn hóa</li>
+            <li>Giới thiệu Connection Team và đội ngũ</li>
+            <li>Câu hỏi cộng đồng: thí sinh nào bạn mong đợi nhất?</li>
+          </ul>
+        </div>
+
+        <div class="cal-item reveal">
+          <div class="cal-item__phase">Giai đoạn 2</div>
+          <div class="cal-item__date">1–7 Tháng 8</div>
+          <h3 class="cal-item__title">Arrival &amp; Cultural Week</h3>
+          <ul class="cal-item__list">
+            <li>LIVE đón thí sinh tại sân bay — khoảnh khắc tự nhiên và cảm xúc</li>
+            <li>Daily: "Meet the Contestant" — 1 thí sinh/ngày trên TikTok &amp; Reels</li>
+            <li>Cultural journey content: Hội An, Huế, Hạ Long, Hà Nội</li>
+            <li>Album ảnh editorial sau mỗi cultural day</li>
+          </ul>
+        </div>
+
+        <div class="cal-item reveal">
+          <div class="cal-item__phase">Giai đoạn 3</div>
+          <div class="cal-item__date">8–13 Tháng 8</div>
+          <h3 class="cal-item__title">Competition Week</h3>
+          <ul class="cal-item__list">
+            <li>LIVE: Talent Show (7/8) — tường thuật toàn bộ</li>
+            <li>Recap video sau mỗi ngày thi đấu</li>
+            <li>Phỏng vấn thí sinh vào top — series "Top Contenders"</li>
+            <li>Behind-the-scenes: trang phục, makeup, hậu trường sân khấu</li>
+          </ul>
+        </div>
+
+        <div class="cal-item cal-item--finale reveal">
+          <div class="cal-item__phase">Chung kết</div>
+          <div class="cal-item__date">14 Tháng 8</div>
+          <h3 class="cal-item__title">Grand Final Night</h3>
+          <ul class="cal-item__list">
+            <li>LIVE đầy đủ trên Facebook &amp; YouTube từ 7h tối</li>
+            <li>Real-time Instagram Stories &amp; TikTok trong đêm</li>
+            <li>Phỏng vấn ngay sau đêm trao vương miện</li>
+            <li>Post-show: recap, phản ứng đội ngũ, cảm xúc thật</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Press & Contacts -->
+  <section class="press-section">
+    <div class="container">
+      <div class="press-header reveal">
+        <div class="section-label">Liên hệ &amp; Tài sản</div>
+        <h2 class="press-heading">Báo chí &amp;<br>Tài nguyên.</h2>
+      </div>
+      <div class="press-row">
+
+        <div class="press-block reveal">
+          <h3 class="press-block__title">Thông tin liên hệ truyền thông</h3>
+          <div class="press-contacts">
+            <div class="press-contact">
+              <div class="press-contact__role">Media Lead (nội bộ)</div>
+              <div class="press-contact__name">Đặng Minh Tú</div>
+              <div class="press-contact__note">Nội dung, hình ảnh, video — liên lạc trực tiếp</div>
+            </div>
+            <div class="press-contact">
+              <div class="press-contact__role">PR Coordinator</div>
+              <div class="press-contact__name">Ban tổ chức Miss World 73</div>
+              <div class="press-contact__note">Mọi yêu cầu từ báo chí bên ngoài phải qua kênh này</div>
+            </div>
+            <div class="press-contact">
+              <div class="press-contact__role">Social Media Manager</div>
+              <div class="press-contact__name">Phạm Lê Thu Hương</div>
+              <div class="press-contact__note">TikTok &amp; Instagram — nội dung, lịch đăng</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="press-block reveal">
+          <h3 class="press-block__title">Tài sản thương hiệu</h3>
+          <ul class="res-list">
+            <li><a href="#">Brand Guidelines Miss World 73 Vietnam (PDF)</a></li>
+            <li><a href="#">Logo pack — màu sắc chính thức (.ai, .png, .svg)</a></li>
+            <li><a href="#">Bộ template Stories &amp; Post (Canva)</a></li>
+            <li><a href="#">Bảng màu &amp; font chữ chính thức</a></li>
+            <li><a href="#">Thư viện ảnh — sự kiện &amp; địa điểm</a></li>
+            <li><a href="#">Nhạc theme Miss World 73 Vietnam</a></li>
+          </ul>
+        </div>
+
+        <div class="press-block reveal">
+          <h3 class="press-block__title">Quy tắc truyền thông</h3>
+          <ul class="rule-list">
+            <li>
+              <span class="rule-icon rule-icon--do">✓</span>
+              <span>Luôn gắn thẻ tài khoản chính thức khi đăng bài liên quan</span>
+            </li>
+            <li>
+              <span class="rule-icon rule-icon--do">✓</span>
+              <span>Xin phép thí sinh trước khi đăng ảnh hoặc video của họ</span>
+            </li>
+            <li>
+              <span class="rule-icon rule-icon--do">✓</span>
+              <span>Sử dụng ảnh từ thư viện chính thức — không dùng ảnh chụp điện thoại cá nhân</span>
+            </li>
+            <li>
+              <span class="rule-icon rule-icon--dont">✗</span>
+              <span>Không đăng bất kỳ nội dung nào liên quan đến chương trình từ tài khoản cá nhân</span>
+            </li>
+            <li>
+              <span class="rule-icon rule-icon--dont">✗</span>
+              <span>Không chia sẻ thông tin hậu trường chưa được phê duyệt</span>
+            </li>
+            <li>
+              <span class="rule-icon rule-icon--dont">✗</span>
+              <span>Không bình luận về kết quả thi đấu trước khi có thông báo chính thức</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__inner">
+        <div class="footer__left">
+          <span class="footer__wordmark">Miss World 73 · Vietnam</span>
+          <p class="footer__note">Tài liệu nội bộ — chỉ dành cho thành viên team.</p>
+        </div>
+        <div class="footer__right">
+          <p class="footer__tag">Chương trình nội bộ · Không công khai</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="Team-Website/Prototype-v1/js/main.js"></script>
+</body>
+</html>
