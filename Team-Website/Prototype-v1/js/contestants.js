@@ -1,9 +1,9 @@
 /* ============================================================
    CONTESTANTS DATA & LOGIC
-   contestants.js — extends main.js (nav scroll already handled)
+   contestants.js — Notion-inspired profile page with in-place editing
 ============================================================ */
 
-const contestants = [
+const rawContestants = [
   {
     id: 'philippines',
     name: 'Maria Santos',
@@ -285,44 +285,360 @@ const contestants = [
   }
 ];
 
-/* ============================================================
-   REVEAL OBSERVER
-   main.js only observes elements present at DOMContentLoaded.
-   Cards are rendered dynamically, so we need a separate observer.
-============================================================ */
+const CONTESTANT_STORAGE_KEY = 'mw73-contestant-cms-v4';
+const COUNTRY_CODES = {
+  philippines: 'ph',
+  india: 'in',
+  france: 'fr',
+  'south-africa': 'za',
+  brazil: 'br'
+};
+const assetModalState = {
+  open: false,
+  kind: '',
+  galleryIndex: null,
+  tempPosition: 50,
+  anchor: null,
+  urlTarget: '',
+  flagSearch: ''
+};
+
+let activeContestantId = null;
+let editDraft = null;
+let editStatus = '';
+let pendingUpload = null;
+
+const contestants = rawContestants.map(normalizeContestantEntity);
+
 const revealObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
-      const delay = parseInt(entry.target.dataset.delay || '0');
+      const delay = parseInt(entry.target.dataset.delay || '0', 10);
       setTimeout(() => entry.target.classList.add('visible'), delay);
       revealObserver.unobserve(entry.target);
     }
   });
 }, { threshold: 0.1 });
 
-/* ============================================================
-   RENDERING
-============================================================ */
-function buildCard(c, index) {
+function normalizeContestantEntity(raw) {
+  return {
+    id: raw.id,
+    country: raw.country,
+    flag: raw.flag,
+    region: raw.region,
+    gradient: raw.gradient,
+    profile: {
+      name: raw.name,
+      tagline: raw.tagline,
+      age: String(raw.age),
+      occupation: raw.occupation,
+      education: raw.education,
+      languages: [...raw.languages],
+      bio: raw.bio
+    },
+    media: {
+      coverImage: raw.media?.coverImage || raw.media?.backgroundImage || '',
+      coverPosition: raw.media?.coverPosition ?? 50,
+      avatarImage: raw.media?.avatarImage || '',
+      flagImage: raw.media?.flagImage || '',
+      gallery: (raw.media?.gallery || []).map(normalizeGalleryItem)
+    },
+    beautyWithPurpose: {
+      title: raw.project.name,
+      description: raw.project.description,
+      image: raw.beautyWithPurpose?.image || '',
+      video: raw.beautyWithPurpose?.video || ''
+    },
+    countryGuide: {
+      capital: raw.culture.capital,
+      traditions: [...raw.culture.traditions],
+      landmarks: [...raw.culture.landmarks],
+      food: [...raw.culture.food],
+      conversationStarters: [...raw.conversation_starters],
+      funFacts: [...raw.fun_facts],
+      pronunciation: {
+        country: { ...raw.pronunciation.country },
+        name: { ...raw.pronunciation.name }
+      }
+    }
+  };
+}
+
+function normalizeGalleryItem(item) {
+  if (typeof item === 'string') {
+    return { src: item, title: '', description: '' };
+  }
+  return {
+    src: item?.src || item?.image || '',
+    title: item?.title || '',
+    description: item?.description || ''
+  };
+}
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function getContestantById(id) {
+  return contestants.find(item => item.id === id);
+}
+
+function getDisplayedContestant() {
+  if (!activeContestantId) return null;
+  return editDraft || getContestantById(activeContestantId);
+}
+
+function isEditing() {
+  return Boolean(editDraft);
+}
+
+function getContestantOverrides() {
+  try {
+    return JSON.parse(localStorage.getItem(CONTESTANT_STORAGE_KEY) || '{}');
+  } catch (error) {
+    console.warn('Could not read contestant overrides:', error);
+    return {};
+  }
+}
+
+function saveContestantOverrides(overrides) {
+  try {
+    localStorage.setItem(CONTESTANT_STORAGE_KEY, JSON.stringify(overrides));
+  } catch (error) {
+    console.warn('Could not save contestant overrides:', error);
+  }
+}
+
+function applyStoredContestantOverrides() {
+  const overrides = getContestantOverrides();
+  contestants.forEach(contestant => {
+    const saved = overrides[contestant.id];
+    if (!saved) return;
+    contestant.profile = deepClone(saved.profile || contestant.profile);
+    contestant.media = {
+      ...contestant.media,
+      ...deepClone(saved.media || {}),
+      gallery: (saved.media?.gallery || contestant.media.gallery).map(normalizeGalleryItem)
+    };
+    contestant.beautyWithPurpose = deepClone(saved.beautyWithPurpose || contestant.beautyWithPurpose);
+    contestant.countryGuide = deepClone(saved.countryGuide || contestant.countryGuide);
+  });
+}
+
+function persistContestant(contestant) {
+  const overrides = getContestantOverrides();
+  overrides[contestant.id] = deepClone({
+    profile: contestant.profile,
+    media: contestant.media,
+    beautyWithPurpose: contestant.beautyWithPurpose,
+    countryGuide: contestant.countryGuide
+  });
+  saveContestantOverrides(overrides);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatText(value) {
+  return escapeHtml(value).replace(/\n/g, '<br>');
+}
+
+function parseCsv(value) {
+  return String(value || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function parseLines(value) {
+  return String(value || '')
+    .split('\n')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function joinLines(items) {
+  return Array.isArray(items) ? items.join('\n') : '';
+}
+
+function buildListItems(items) {
+  return items.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+}
+
+function cssUrl(url) {
+  return `url("${String(url || '').replace(/"/g, '%22').replace(/\n/g, '')}")`;
+}
+
+function getYouTubeEmbedUrl(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtu.be')) {
+      return `https://www.youtube.com/embed/${parsed.pathname.replace('/', '')}`;
+    }
+    if (parsed.hostname.includes('youtube.com')) {
+      return `https://www.youtube.com/embed/${parsed.searchParams.get('v') || ''}`;
+    }
+  } catch (error) {
+    return '';
+  }
+  return '';
+}
+
+function svgToDataUri(svg) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function getGeneratedFlagBackground(contestant) {
+  const builders = {
+    philippines: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><rect width="1600" height="450" fill="#0038A8"/><rect y="450" width="1600" height="450" fill="#CE1126"/><polygon points="0,0 0,900 700,450" fill="#FFFFFF"/><circle cx="185" cy="450" r="86" fill="#FCD116"/></svg>`),
+    india: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><rect width="1600" height="300" fill="#FF9933"/><rect y="300" width="1600" height="300" fill="#FFFFFF"/><rect y="600" width="1600" height="300" fill="#138808"/><circle cx="800" cy="450" r="108" fill="none" stroke="#1A3C8B" stroke-width="18"/></svg>`),
+    france: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><rect width="533.33" height="900" fill="#0055A4"/><rect x="533.33" width="533.33" height="900" fill="#FFFFFF"/><rect x="1066.66" width="533.34" height="900" fill="#EF4135"/></svg>`),
+    'south-africa': () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><rect width="1600" height="450" fill="#DE3831"/><rect y="450" width="1600" height="450" fill="#002395"/><polygon points="0,0 620,450 0,900" fill="#000000"/><polyline points="0,90 520,450 0,810" fill="none" stroke="#FFFFFF" stroke-width="190" stroke-linejoin="round"/><polyline points="0,120 560,450 0,780" fill="none" stroke="#007A4D" stroke-width="130" stroke-linejoin="round"/></svg>`),
+    brazil: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><rect width="1600" height="900" fill="#009B3A"/><polygon points="800,120 1360,450 800,780 240,450" fill="#FFDF00"/><circle cx="800" cy="450" r="190" fill="#002776"/></svg>`)
+  };
+  return (builders[contestant.id] || (() => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#003876"/><stop offset="100%" stop-color="#C9A84C"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/></svg>`)))();
+}
+
+function getBuiltInFlagBadgeSource(id) {
+  const builders = {
+    philippines: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="32" fill="#0038A8"/><rect y="32" width="96" height="32" fill="#CE1126"/><polygon points="0,0 0,64 44,32" fill="#FFFFFF"/><circle cx="12" cy="32" r="6" fill="#FCD116"/></svg>`),
+    india: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="21.33" fill="#FF9933"/><rect y="21.33" width="96" height="21.33" fill="#FFFFFF"/><rect y="42.66" width="96" height="21.34" fill="#138808"/><circle cx="48" cy="32" r="7.5" fill="none" stroke="#1A3C8B" stroke-width="1.8"/></svg>`),
+    france: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="32" height="64" fill="#0055A4"/><rect x="32" width="32" height="64" fill="#FFFFFF"/><rect x="64" width="32" height="64" fill="#EF4135"/></svg>`),
+    'south-africa': () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="32" fill="#DE3831"/><rect y="32" width="96" height="32" fill="#002395"/><polygon points="0,0 32,32 0,64" fill="#000000"/><polyline points="0,6 28,32 0,58" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linejoin="round"/><polyline points="0,8 32,32 0,56" fill="none" stroke="#007A4D" stroke-width="8" stroke-linejoin="round"/></svg>`),
+    brazil: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="64" fill="#009B3A"/><polygon points="48,8 82,32 48,56 14,32" fill="#FFDF00"/><circle cx="48" cy="32" r="11" fill="#002776"/></svg>`)
+  };
+  return (builders[id] || (() => ''))();
+}
+
+const FLAG_GALLERY_OPTIONS = rawContestants.map(contestant => ({
+  id: contestant.id,
+  country: contestant.country,
+  src: getBuiltInFlagBadgeSource(contestant.id)
+})).filter(option => option.src);
+
+function getCoverImage(contestant) {
+  return contestant.media.coverImage || getGeneratedFlagBackground(contestant);
+}
+
+function getDefaultFlagBadge(contestant) {
+  return getBuiltInFlagBadgeSource(contestant.id);
+}
+
+function getFlagBadgeImage(contestant) {
+  return contestant.media.flagImage || getDefaultFlagBadge(contestant);
+}
+
+function getAvatarMarkup(contestant, options = {}) {
+  const flagImage = getFlagBadgeImage(contestant);
+  const showControls = options.showControls && isEditing();
+  if (contestant.media.avatarImage) {
+    return `
+      <div class="profile-avatar-stack">
+        <img class="notion-avatar__image" src="${escapeHtml(contestant.media.avatarImage)}" alt="${escapeHtml(contestant.profile.name)} avatar" />
+        ${flagImage ? `<img class="notion-avatar__flag" src="${escapeHtml(flagImage)}" alt="${escapeHtml(contestant.country)} flag" />` : ''}
+        ${showControls ? `<div class="notion-avatar__controls">${buildIconButton('avatar-change', 'image', 'Edit avatar images')}</div>` : ''}
+      </div>
+    `;
+  }
+  return `
+    <div class="profile-avatar-stack">
+      <div class="notion-avatar__fallback">${contestant.flag}</div>
+      ${flagImage ? `<img class="notion-avatar__flag" src="${escapeHtml(flagImage)}" alt="${escapeHtml(contestant.country)} flag" />` : ''}
+      ${showControls ? `<div class="notion-avatar__controls">${buildIconButton('avatar-change', 'image', 'Edit avatar images')}</div>` : ''}
+    </div>
+  `;
+}
+
+function buildCoverStyle(contestant) {
+  const position = contestant.media.coverPosition ?? 50;
+  return `background-image:${cssUrl(getCoverImage(contestant))}; background-position:center ${position}%;`;
+}
+
+function iconSvg(kind) {
+  const icons = {
+    pencil: '<path d="M4 20h4l9.5-9.5-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12.5 6.5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+    check: '<path d="M5 12.5l4.2 4.2L19 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    close: '<path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+    image: '<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M20 16l-4.5-4.5L9 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    link: '<path d="M10 14l4-4M8.5 16.5l-2 2a3 3 0 1 1-4.2-4.2l2-2M15.5 7.5l2-2a3 3 0 1 1 4.2 4.2l-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    move: '<path d="M12 4v16M4 12h16M8 8l4-4 4 4M8 16l4 4 4-4M16 8l4 4-4 4M8 8l-4 4 4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
+    plus: '<path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+    trash: '<path d="M5 7h14M10 11v5M14 11v5M8 7l1-2h6l1 2M7 7l1 12h8l1-12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    video: '<rect x="4" y="6" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M16 11l4-2.5v7L16 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" width="16" height="16" aria-hidden="true">${icons[kind]}</svg>`;
+}
+
+function buildIconButton(action, icon, label, extra = '') {
+  return `<button class="icon-action ${extra}" type="button" data-action="${action}" aria-label="${escapeHtml(label)}">${iconSvg(icon)}</button>`;
+}
+
+function buildField(label, name, value, options = {}) {
+  const { textarea = false, rows = 4, type = 'text', placeholder = '', compact = false, hideLabel = true } = options;
+  const fieldPlaceholder = placeholder || label;
+  return `
+    <label class="notion-field ${compact ? 'notion-field--compact' : ''}">
+      <span class="${hideLabel ? 'sr-only' : 'notion-field__label'}">${escapeHtml(label)}</span>
+      ${textarea
+        ? `<textarea class="notion-field__control notion-field__control--textarea" name="${escapeHtml(name)}" rows="${rows}" placeholder="${escapeHtml(fieldPlaceholder)}">${escapeHtml(value)}</textarea>`
+        : `<input class="notion-field__control" type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(fieldPlaceholder)}" />`
+      }
+    </label>
+  `;
+}
+
+function buildModalActions() {
+  if (!activeContestantId) return '';
+  if (isEditing()) {
+    return `
+      ${buildIconButton('cancel-edit', 'close', 'Cancel editing')}
+      ${buildIconButton('save-edit', 'check', 'Save changes', 'icon-action--primary')}
+    `;
+  }
+  return buildIconButton('start-edit', 'pencil', 'Edit contestant');
+}
+
+function renderModalActions() {
+  const actions = document.querySelector('[data-role="modal-actions"]');
+  if (actions) actions.innerHTML = buildModalActions();
+}
+
+function buildCard(contestant, index) {
   const card = document.createElement('div');
   card.className = 'ccard reveal';
-  card.dataset.id = c.id;
+  card.dataset.id = contestant.id;
   card.dataset.delay = String(index * 80);
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', `Open ${contestant.profile.name} profile`);
   card.innerHTML = `
-    <div class="ccard__visual ccard__visual--${c.gradient}">
-      <span class="ccard__flag">${c.flag}</span>
+    <div class="ccard__visual" style="background-image:linear-gradient(180deg, rgba(7,16,31,0.18) 0%, rgba(7,16,31,0.82) 100%), ${cssUrl(getCoverImage(contestant))}; background-position:center ${contestant.media.coverPosition ?? 50}%;">
+      <span class="ccard__flag">${contestant.flag}</span>
     </div>
     <div class="ccard__body">
       <div class="ccard__meta">
-        <span class="ccard__region">${c.region}</span>
+        <span class="ccard__region">${escapeHtml(contestant.region)}</span>
         <span class="ccard__arrow">→</span>
       </div>
-      <h3 class="ccard__name">${c.name}</h3>
-      <p class="ccard__country">${c.country}</p>
-      <p class="ccard__tagline">${c.tagline}</p>
+      <h3 class="ccard__name">${escapeHtml(contestant.profile.name)}</h3>
+      <p class="ccard__country">${escapeHtml(contestant.country)}</p>
+      <p class="ccard__tagline">${escapeHtml(contestant.profile.tagline)}</p>
     </div>
   `;
-  card.addEventListener('click', () => openProfile(c.id));
+  card.addEventListener('click', () => openProfile(contestant.id));
+  card.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      openProfile(contestant.id);
+    }
+  });
   return card;
 }
 
@@ -330,153 +646,303 @@ function renderGrid(list) {
   const grid = document.getElementById('contestants-grid');
   const noResults = document.getElementById('no-results');
   const countEl = document.getElementById('filter-count');
-
   grid.innerHTML = '';
-
   if (list.length === 0) {
     noResults.style.display = 'block';
     countEl.textContent = '0 contestants';
     return;
   }
-
   noResults.style.display = 'none';
   countEl.textContent = `${list.length} contestant${list.length !== 1 ? 's' : ''}`;
-
-  list.forEach((c, i) => {
-    const card = buildCard(c, i);
+  list.forEach((contestant, index) => {
+    const card = buildCard(contestant, index);
     grid.appendChild(card);
     revealObserver.observe(card);
   });
 }
 
-/* ============================================================
-   FILTER
-============================================================ */
 function getFiltered() {
   const query = document.getElementById('search-input').value.toLowerCase().trim();
   const region = document.getElementById('filter-region').value;
   const language = document.getElementById('filter-language').value;
-
-  return contestants.filter(c => {
-    const matchSearch = !query ||
-      c.name.toLowerCase().includes(query) ||
-      c.country.toLowerCase().includes(query);
-    const matchRegion = !region || c.region === region;
-    const matchLang = !language || c.languages.includes(language);
+  return contestants.filter(contestant => {
+    const matchSearch = !query || contestant.profile.name.toLowerCase().includes(query) || contestant.country.toLowerCase().includes(query);
+    const matchRegion = !region || contestant.region === region;
+    const matchLang = !language || contestant.profile.languages.includes(language);
     return matchSearch && matchRegion && matchLang;
   });
 }
 
-/* ============================================================
-   PROFILE MODAL — BUILD HTML
-============================================================ */
-function buildListItems(items) {
-  return items.map(item => `<li>${item}</li>`).join('');
+function buildGallery(contestant) {
+  const editing = isEditing();
+  if (!contestant.media.gallery.length) {
+    return `<div class="profile-empty-state">${editing ? 'No gallery yet. Use + Add image to start the gallery.' : 'No gallery images yet.'}</div>`;
+  }
+  return `
+    <div class="gallery-rail">
+      ${contestant.media.gallery.map((item, index) => `
+        <article class="gallery-card">
+          <div class="gallery-card__image-wrap">
+            <img class="gallery-card__image" src="${escapeHtml(item.src)}" alt="${escapeHtml(item.title || contestant.profile.name)}" loading="lazy" />
+            ${editing ? `
+              <div class="gallery-card__controls">
+                ${buildIconButton(`gallery-change:${index}`, 'image', 'Change gallery image')}
+                ${buildIconButton(`gallery-remove:${index}`, 'trash', 'Remove gallery image')}
+              </div>
+            ` : ''}
+          </div>
+          <div class="gallery-card__meta">
+            ${editing ? `
+              ${buildField('Title', `gallery.${index}.title`, item.title, { compact: true })}
+              ${buildField('Description', `gallery.${index}.description`, item.description, { textarea: true, rows: 3, compact: true })}
+            ` : `
+              ${item.title ? `<h4 class="gallery-card__title">${escapeHtml(item.title)}</h4>` : ''}
+              ${item.description ? `<p class="gallery-card__description">${escapeHtml(item.description)}</p>` : ''}
+            `}
+          </div>
+        </article>
+      `).join('')}
+    </div>
+  `;
 }
 
-function buildProfile(c) {
+function buildBeautyMedia(contestant) {
+  const beauty = contestant.beautyWithPurpose;
+  const embedUrl = getYouTubeEmbedUrl(beauty.video);
   return `
-    <div class="profile-header">
-      <div class="profile-flag-block">${c.flag}</div>
-      <div class="profile-intro">
-        <div class="section-label">${c.country} · ${c.region}</div>
-        <h2 class="profile-name">${c.name}</h2>
-        <p class="profile-tagline-text">${c.tagline}</p>
+    <div class="beauty-media-grid">
+      <div class="beauty-media-card">
+        <div class="beauty-media-card__label">Image</div>
+        ${beauty.image
+          ? `<img class="beauty-media-card__image" src="${escapeHtml(beauty.image)}" alt="${escapeHtml(beauty.title)}" loading="lazy" />`
+          : `<div class="beauty-media-card__empty">No image added yet.</div>`
+        }
       </div>
-    </div>
-
-    <div class="profile-basics">
-      <div class="profile-basic">
-        <span class="profile-basic__label">Age</span>
-        <span class="profile-basic__value">${c.age}</span>
-      </div>
-      <div class="profile-basic">
-        <span class="profile-basic__label">Occupation</span>
-        <span class="profile-basic__value">${c.occupation}</span>
-      </div>
-      <div class="profile-basic">
-        <span class="profile-basic__label">Education</span>
-        <span class="profile-basic__value">${c.education}</span>
-      </div>
-      <div class="profile-basic">
-        <span class="profile-basic__label">Languages</span>
-        <span class="profile-basic__value">${c.languages.join(', ')}</span>
-      </div>
-    </div>
-
-    <div class="profile-section">
-      <h3 class="profile-section__title">Personal Bio</h3>
-      <p>${c.bio}</p>
-    </div>
-
-    <div class="profile-section">
-      <h3 class="profile-section__title">Beauty With A Purpose</h3>
-      <div class="project-block">
-        <div class="project-block__name">${c.project.name}</div>
-        <p>${c.project.description}</p>
-      </div>
-    </div>
-
-    <div class="profile-section">
-      <h3 class="profile-section__title">Country Culture Guide</h3>
-      <div class="culture-grid">
-        <div class="culture-item">
-          <div class="culture-item__label">Capital</div>
-          <div class="culture-item__value">${c.culture.capital}</div>
-        </div>
-        <div class="culture-item">
-          <div class="culture-item__label">Cultural Traditions</div>
-          <ul>${buildListItems(c.culture.traditions)}</ul>
-        </div>
-        <div class="culture-item">
-          <div class="culture-item__label">Landmarks to Know</div>
-          <ul>${buildListItems(c.culture.landmarks)}</ul>
-        </div>
-        <div class="culture-item">
-          <div class="culture-item__label">Food &amp; Drink</div>
-          <ul>${buildListItems(c.culture.food)}</ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="profile-section">
-      <h3 class="profile-section__title">Conversation Starters</h3>
-      <ol class="conversation-list">${buildListItems(c.conversation_starters)}</ol>
-    </div>
-
-    <div class="profile-section">
-      <h3 class="profile-section__title">Fun Facts</h3>
-      <ul class="fun-facts-list">${buildListItems(c.fun_facts)}</ul>
-    </div>
-
-    <div class="profile-section">
-      <h3 class="profile-section__title">Pronunciation Guide</h3>
-      <div class="pronunciation-grid">
-        <div class="pronunciation-item">
-          <div class="pronunciation-item__label">Country — ${c.pronunciation.country.word}</div>
-          <div class="pronunciation-item__phonetic">${c.pronunciation.country.phonetic}</div>
-        </div>
-        <div class="pronunciation-item">
-          <div class="pronunciation-item__label">Name — ${c.pronunciation.name.word}</div>
-          <div class="pronunciation-item__phonetic">${c.pronunciation.name.phonetic}</div>
-        </div>
+      <div class="beauty-media-card">
+        <div class="beauty-media-card__label">Video</div>
+        ${embedUrl
+          ? `<iframe class="beauty-media-card__video" src="${escapeHtml(embedUrl)}" title="${escapeHtml(beauty.title)} video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+          : beauty.video
+            ? `<div class="beauty-media-card__link-wrap"><a class="beauty-media-card__link" href="${escapeHtml(beauty.video)}" target="_blank" rel="noopener noreferrer">Open video link</a></div>`
+            : `<div class="beauty-media-card__empty">No video link added yet.</div>`
+        }
       </div>
     </div>
   `;
 }
 
-/* ============================================================
-   MODAL OPEN / CLOSE
-============================================================ */
-function openProfile(id) {
-  const c = contestants.find(x => x.id === id);
-  if (!c) return;
+function buildProfile(contestant) {
+  const editing = isEditing();
+  const { profile, media, beautyWithPurpose: beauty, countryGuide } = contestant;
+  return `
+    ${editing && editStatus ? `<div class="profile-edit-status">${escapeHtml(editStatus)}</div>` : ''}
+    <div class="notion-page">
+      <section class="notion-cover" style="${buildCoverStyle(contestant)}">
+        ${editing ? `
+          <div class="notion-cover__controls">
+            ${buildIconButton('cover-change', 'image', 'Change cover image')}
+            ${buildIconButton('cover-reposition', 'move', 'Reposition cover image')}
+          </div>
+        ` : ''}
+      </section>
 
+      <div class="notion-page__content">
+        <section class="profile-identity-card">
+          <div class="profile-identity-card__actions" data-role="modal-actions"></div>
+          <div class="profile-identity-card__main">
+            <div class="notion-avatar">
+              ${getAvatarMarkup(contestant, { showControls: true })}
+            </div>
+            <div class="profile-social-copy">
+              ${editing
+                ? `
+                  <div class="profile-social-copy__fields">
+                    ${buildField('Name', 'profile.name', profile.name, { placeholder: 'Name' })}
+                    ${buildField('Short Bio', 'profile.tagline', profile.tagline, { textarea: true, rows: 3, placeholder: 'Short Bio' })}
+                  </div>
+                `
+                : `
+                  <h1 class="notion-header__title">${escapeHtml(profile.name)}</h1>
+                  <p class="notion-header__subtitle">${escapeHtml(profile.tagline)}</p>
+                `
+              }
+            </div>
+          </div>
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading">
+            <h3 class="profile-section__title">Personal Information</h3>
+          </div>
+          <div class="notion-info-grid">
+            ${editing
+              ? `
+                ${buildField('Age', 'profile.age', profile.age, { type: 'number' })}
+                ${buildField('Occupation', 'profile.occupation', profile.occupation)}
+                ${buildField('Education', 'profile.education', profile.education, { textarea: true, rows: 3 })}
+                ${buildField('Languages', 'profile.languages', profile.languages.join(', '))}
+              `
+              : `
+                <div class="notion-info-card"><span class="notion-info-card__label">Age</span><span class="notion-info-card__value">${escapeHtml(profile.age)}</span></div>
+                <div class="notion-info-card"><span class="notion-info-card__label">Occupation</span><span class="notion-info-card__value">${escapeHtml(profile.occupation)}</span></div>
+                <div class="notion-info-card"><span class="notion-info-card__label">Education</span><span class="notion-info-card__value">${escapeHtml(profile.education)}</span></div>
+                <div class="notion-info-card"><span class="notion-info-card__label">Languages</span><span class="notion-info-card__value">${escapeHtml(profile.languages.join(', '))}</span></div>
+              `
+            }
+          </div>
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading">
+            <h3 class="profile-section__title">Personal Bio</h3>
+          </div>
+          ${editing
+            ? buildField('Bio', 'profile.bio', profile.bio, { textarea: true, rows: 8 })
+            : `<div class="notion-body-copy">${formatText(profile.bio)}</div>`
+          }
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading">
+            <h3 class="profile-section__title">Image Gallery</h3>
+            ${editing ? `<button class="gallery-add-action" type="button" data-action="gallery-add">${iconSvg('plus')}<span>Add image</span></button>` : ''}
+          </div>
+          ${buildGallery(contestant)}
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading">
+            <h3 class="profile-section__title">Beauty With A Purpose</h3>
+            ${editing ? `<div class="section-icon-actions">${buildIconButton('beauty-image', 'image', 'Update Beauty With A Purpose image')}${buildIconButton('beauty-video', 'video', 'Update Beauty With A Purpose video')}</div>` : ''}
+          </div>
+          ${editing ? `
+            <div class="notion-form-stack">
+              ${buildField('Project Title', 'beauty.title', beauty.title)}
+              ${buildField('Project Description', 'beauty.description', beauty.description, { textarea: true, rows: 6 })}
+              ${buildField('Video URL', 'beauty.video', beauty.video, { placeholder: 'https://www.youtube.com/watch?v=...' })}
+            </div>
+          ` : ''}
+          <div class="project-block">
+            <div class="project-block__name">${escapeHtml(beauty.title)}</div>
+            <p>${formatText(beauty.description)}</p>
+          </div>
+          ${buildBeautyMedia(contestant)}
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading">
+            <h3 class="profile-section__title">Country Culture Guide</h3>
+          </div>
+          ${editing ? `
+            <div class="notion-form-stack">
+              ${buildField('Capital', 'country.capital', countryGuide.capital)}
+              ${buildField('Cultural Traditions', 'country.traditions', joinLines(countryGuide.traditions), { textarea: true, rows: 5 })}
+              ${buildField('Landmarks', 'country.landmarks', joinLines(countryGuide.landmarks), { textarea: true, rows: 5 })}
+              ${buildField('Food & Drink', 'country.food', joinLines(countryGuide.food), { textarea: true, rows: 5 })}
+            </div>
+          ` : ''}
+          <div class="culture-grid">
+            <div class="culture-item"><div class="culture-item__label">Capital</div><div class="culture-item__value">${escapeHtml(countryGuide.capital)}</div></div>
+            <div class="culture-item"><div class="culture-item__label">Cultural Traditions</div><ul>${buildListItems(countryGuide.traditions)}</ul></div>
+            <div class="culture-item"><div class="culture-item__label">Landmarks to Know</div><ul>${buildListItems(countryGuide.landmarks)}</ul></div>
+            <div class="culture-item"><div class="culture-item__label">Food &amp; Drink</div><ul>${buildListItems(countryGuide.food)}</ul></div>
+          </div>
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading"><h3 class="profile-section__title">Conversation Starters</h3></div>
+          ${editing ? buildField('Conversation Starters', 'country.conversationStarters', joinLines(countryGuide.conversationStarters), { textarea: true, rows: 6 }) : ''}
+          <ol class="conversation-list">${buildListItems(countryGuide.conversationStarters)}</ol>
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading"><h3 class="profile-section__title">Fun Facts</h3></div>
+          ${editing ? buildField('Fun Facts', 'country.funFacts', joinLines(countryGuide.funFacts), { textarea: true, rows: 5 }) : ''}
+          <ul class="fun-facts-list">${buildListItems(countryGuide.funFacts)}</ul>
+        </section>
+
+        <section class="profile-section profile-section--notion">
+          <div class="profile-section__heading"><h3 class="profile-section__title">Pronunciation Guide</h3></div>
+          ${editing ? `
+            <div class="notion-info-grid notion-info-grid--editing">
+              ${buildField('Country Label', 'country.pronunciationCountryWord', countryGuide.pronunciation.country.word)}
+              ${buildField('Country Pronunciation', 'country.pronunciationCountryPhonetic', countryGuide.pronunciation.country.phonetic)}
+              ${buildField('Name Label', 'country.pronunciationNameWord', countryGuide.pronunciation.name.word)}
+              ${buildField('Name Pronunciation', 'country.pronunciationNamePhonetic', countryGuide.pronunciation.name.phonetic)}
+            </div>
+          ` : ''}
+          <div class="pronunciation-grid">
+            <div class="pronunciation-item">
+              <div class="pronunciation-item__label">Country — ${escapeHtml(countryGuide.pronunciation.country.word)}</div>
+              <div class="pronunciation-item__phonetic">${escapeHtml(countryGuide.pronunciation.country.phonetic)}</div>
+            </div>
+            <div class="pronunciation-item">
+              <div class="pronunciation-item__label">Name — ${escapeHtml(countryGuide.pronunciation.name.word)}</div>
+              <div class="pronunciation-item__phonetic">${escapeHtml(countryGuide.pronunciation.name.phonetic)}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+function renderActiveProfile() {
+  if (!activeContestantId) return;
+  const contestant = getDisplayedContestant();
+  const content = document.getElementById('modal-content');
+  if (!contestant || !content) return;
+  content.innerHTML = buildProfile(contestant);
+  renderModalActions();
+}
+
+function getFieldValue(name) {
+  const root = document.getElementById('modal-content');
+  if (!root) return '';
+  const field = root.querySelector(`[name="${CSS.escape(name)}"]`);
+  return field ? String(field.value || '').trim() : '';
+}
+
+function syncDraftFromForm() {
+  if (!editDraft) return;
+  editDraft.profile.name = getFieldValue('profile.name');
+  editDraft.profile.tagline = getFieldValue('profile.tagline');
+  editDraft.profile.age = getFieldValue('profile.age');
+  editDraft.profile.occupation = getFieldValue('profile.occupation');
+  editDraft.profile.education = getFieldValue('profile.education');
+  editDraft.profile.languages = parseCsv(getFieldValue('profile.languages'));
+  editDraft.profile.bio = getFieldValue('profile.bio');
+
+  editDraft.beautyWithPurpose.title = getFieldValue('beauty.title');
+  editDraft.beautyWithPurpose.description = getFieldValue('beauty.description');
+  editDraft.beautyWithPurpose.video = getFieldValue('beauty.video');
+
+  editDraft.countryGuide.capital = getFieldValue('country.capital');
+  editDraft.countryGuide.traditions = parseLines(getFieldValue('country.traditions'));
+  editDraft.countryGuide.landmarks = parseLines(getFieldValue('country.landmarks'));
+  editDraft.countryGuide.food = parseLines(getFieldValue('country.food'));
+  editDraft.countryGuide.conversationStarters = parseLines(getFieldValue('country.conversationStarters'));
+  editDraft.countryGuide.funFacts = parseLines(getFieldValue('country.funFacts'));
+  editDraft.countryGuide.pronunciation.country.word = getFieldValue('country.pronunciationCountryWord') || editDraft.country;
+  editDraft.countryGuide.pronunciation.country.phonetic = getFieldValue('country.pronunciationCountryPhonetic');
+  editDraft.countryGuide.pronunciation.name.word = getFieldValue('country.pronunciationNameWord') || editDraft.profile.name;
+  editDraft.countryGuide.pronunciation.name.phonetic = getFieldValue('country.pronunciationNamePhonetic');
+
+  editDraft.media.gallery.forEach((item, index) => {
+    item.title = getFieldValue(`gallery.${index}.title`);
+    item.description = getFieldValue(`gallery.${index}.description`);
+  });
+}
+
+function openProfile(id) {
+  const contestant = getContestantById(id);
+  if (!contestant) return;
+  activeContestantId = id;
+  editDraft = null;
+  editStatus = '';
+  renderActiveProfile();
   const modal = document.getElementById('profile-modal');
   const panel = document.getElementById('modal-panel');
-  const content = document.getElementById('modal-content');
-
-  content.innerHTML = buildProfile(c);
   panel.scrollTop = 0;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
@@ -484,31 +950,517 @@ function openProfile(id) {
 }
 
 function closeProfile() {
-  const modal = document.getElementById('profile-modal');
-  modal.classList.remove('open');
-  modal.setAttribute('aria-hidden', 'true');
+  document.getElementById('profile-modal').classList.remove('open');
+  document.getElementById('profile-modal').setAttribute('aria-hidden', 'true');
+  activeContestantId = null;
+  editDraft = null;
+  editStatus = '';
+  closeAssetModal();
   document.body.style.overflow = '';
 }
 
-/* ============================================================
-   INIT
-============================================================ */
+function startEditMode() {
+  if (!activeContestantId) return;
+  const contestant = getContestantById(activeContestantId);
+  if (!contestant) return;
+  editDraft = deepClone(contestant);
+  editStatus = '';
+  renderActiveProfile();
+}
+
+function cancelEditMode() {
+  editDraft = null;
+  editStatus = '';
+  closeAssetModal();
+  renderActiveProfile();
+}
+
+function saveEditMode() {
+  if (!activeContestantId || !editDraft) return;
+  syncDraftFromForm();
+  const contestant = getContestantById(activeContestantId);
+  contestant.profile = deepClone(editDraft.profile);
+  contestant.media = deepClone(editDraft.media);
+  contestant.beautyWithPurpose = deepClone(editDraft.beautyWithPurpose);
+  contestant.countryGuide = deepClone(editDraft.countryGuide);
+  persistContestant(contestant);
+  editDraft = null;
+  editStatus = '';
+  renderGrid(getFiltered());
+  renderActiveProfile();
+}
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Could not process image.'));
+    image.src = source;
+  });
+}
+
+async function optimizeImageFile(file, options = {}) {
+  const { maxWidth = 1400, quality = 0.82 } = options;
+  const source = await readFile(file);
+  const image = await loadImage(source);
+  const scale = Math.min(1, maxWidth / image.width);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+function assetPreviewMarkup() {
+  if (!editDraft) return '';
+  if (assetModalState.kind === 'cover-change' || assetModalState.kind === 'cover-reposition') {
+    return `<div class="asset-popover__cover-preview" style="${buildCoverStyle(editDraft)}"></div>`;
+  }
+  if (assetModalState.kind === 'gallery-add' || assetModalState.kind === 'gallery-change') {
+    const item = assetModalState.galleryIndex != null ? editDraft.media.gallery[assetModalState.galleryIndex] : null;
+    return item?.src ? `<img class="asset-popover__gallery-preview" src="${escapeHtml(item.src)}" alt="Gallery preview" />` : `<div class="asset-popover__empty">No image selected yet.</div>`;
+  }
+  if (assetModalState.kind === 'beauty-image') {
+    return editDraft.beautyWithPurpose.image
+      ? `<img class="asset-popover__gallery-preview" src="${escapeHtml(editDraft.beautyWithPurpose.image)}" alt="Beauty image preview" />`
+      : `<div class="asset-popover__empty">No image selected yet.</div>`;
+  }
+  return '';
+}
+
+function buildAssetSlot(label, previewMarkup, uploadAction, inputId, value = '', placeholder = 'https://example.com/image.jpg') {
+  const showUrlField = assetModalState.urlTarget === inputId;
+  return `
+    <div class="asset-popover__slot">
+      <div class="asset-popover__slot-label">${escapeHtml(label)}</div>
+      <div class="asset-popover__slot-preview">${previewMarkup}</div>
+      <div class="asset-popover__icon-actions">
+        <button class="icon-action" type="button" data-asset-action="${uploadAction}" aria-label="Upload local image">${iconSvg('image')}</button>
+        <button class="icon-action ${showUrlField ? 'icon-action--primary' : ''}" type="button" data-asset-action="toggle-url:${inputId}" aria-label="Use image URL">${iconSvg('link')}</button>
+      </div>
+      ${showUrlField ? `<div class="asset-popover__url-inline"><input class="asset-popover__input" id="${inputId}" type="url" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" /></div>` : ''}
+    </div>
+  `;
+}
+
+function buildAssetModal() {
+  if (!editDraft || !assetModalState.open) return '';
+  const showUrlField = assetModalState.urlTarget === 'asset-url-input';
+
+  if (assetModalState.kind === 'cover-change') {
+    return `
+      <div class="asset-popover__body">
+        <div class="asset-popover__title-wrap">
+          <h3 class="asset-popover__title" id="asset-title">Cover image</h3>
+        </div>
+        ${assetPreviewMarkup()}
+        <div class="asset-popover__icon-actions">
+          <button class="icon-action" type="button" data-asset-action="upload-image" aria-label="Upload local image">${iconSvg('image')}</button>
+          <button class="icon-action ${showUrlField ? 'icon-action--primary' : ''}" type="button" data-asset-action="toggle-url:asset-url-input" aria-label="Use image URL">${iconSvg('link')}</button>
+        </div>
+        ${showUrlField ? `<div class="asset-popover__url-inline"><input class="asset-popover__input" id="asset-url-input" type="url" value="${escapeHtml(editDraft.media.coverImage || '')}" placeholder="https://example.com/cover.jpg" /><button class="icon-action icon-action--primary" type="button" data-asset-action="apply-url" aria-label="Apply image URL">${iconSvg('check')}</button></div>` : ''}
+        <div class="asset-popover__footer">
+          <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Done</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (assetModalState.kind === 'cover-reposition') {
+    return `
+      <div class="asset-popover__body">
+        <div class="asset-popover__title-wrap">
+          <h3 class="asset-popover__title" id="asset-title">Reposition cover</h3>
+        </div>
+        ${assetPreviewMarkup()}
+        <label class="asset-popover__slider-wrap">
+          <span>Vertical position</span>
+          <input class="asset-popover__slider" id="cover-position-slider" type="range" min="0" max="100" value="${assetModalState.tempPosition}" />
+        </label>
+        <div class="asset-popover__footer">
+          <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Cancel</button>
+          <button class="asset-popover__button" type="button" data-asset-action="apply-reposition">Apply</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (assetModalState.kind === 'avatar') {
+    const mainPreview = editDraft.media.avatarImage
+      ? `<img class="asset-popover__avatar-preview" src="${escapeHtml(editDraft.media.avatarImage)}" alt="Main avatar preview" />`
+      : `<div class="asset-popover__avatar-fallback">${editDraft.flag}</div>`;
+    const flagPreview = getFlagBadgeImage(editDraft)
+      ? `<img class="asset-popover__flag-preview" src="${escapeHtml(getFlagBadgeImage(editDraft))}" alt="${escapeHtml(editDraft.country)} flag" />`
+      : `<div class="asset-popover__flag-fallback">${editDraft.flag}</div>`;
+    return `
+      <div class="asset-popover__body">
+        <div class="asset-popover__title-wrap">
+          <h3 class="asset-popover__title" id="asset-title">Edit Avatar Images</h3>
+        </div>
+        <div class="asset-popover__slots">
+          ${buildAssetSlot('Main avatar', mainPreview, 'upload-avatar-image', 'asset-avatar-url-input', editDraft.media.avatarImage || '', 'https://example.com/avatar.jpg')}
+          ${buildAssetSlot('Flag badge', flagPreview, 'upload-flag-image', 'asset-flag-url-input', editDraft.media.flagImage || '', 'https://example.com/flag.png')}
+        </div>
+        <div class="asset-popover__flag-picker">
+          <input class="asset-popover__search" id="flag-search-input" type="search" value="${escapeHtml(assetModalState.flagSearch)}" placeholder="Search country flag..." />
+          <div class="asset-popover__flag-grid">
+            ${FLAG_GALLERY_OPTIONS
+              .filter(option => option.country.toLowerCase().includes(assetModalState.flagSearch.toLowerCase().trim()))
+              .map(option => `
+                <button class="asset-popover__flag-option ${getFlagBadgeImage(editDraft) === option.src ? 'is-selected' : ''}" type="button" data-asset-action="select-flag:${option.id}" aria-label="Use ${escapeHtml(option.country)} flag">
+                  <img src="${escapeHtml(option.src)}" alt="${escapeHtml(option.country)} flag" />
+                  <span>${escapeHtml(option.country)}</span>
+                </button>
+              `).join('')}
+          </div>
+        </div>
+        <div class="asset-popover__footer">
+          <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Cancel</button>
+          <button class="asset-popover__button" type="button" data-asset-action="apply-avatar">Apply</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (assetModalState.kind === 'gallery-add' || assetModalState.kind === 'gallery-change') {
+    const urlValue = assetModalState.kind === 'gallery-change' && assetModalState.galleryIndex != null
+      ? editDraft.media.gallery[assetModalState.galleryIndex]?.src || ''
+      : '';
+    return `
+      <div class="asset-popover__body">
+        <div class="asset-popover__title-wrap">
+          <h3 class="asset-popover__title" id="asset-title">${assetModalState.kind === 'gallery-add' ? 'Add gallery image' : 'Update gallery image'}</h3>
+        </div>
+        ${assetPreviewMarkup()}
+        <div class="asset-popover__icon-actions">
+          <button class="icon-action" type="button" data-asset-action="upload-image" aria-label="Upload local image">${iconSvg('image')}</button>
+          <button class="icon-action ${showUrlField ? 'icon-action--primary' : ''}" type="button" data-asset-action="toggle-url:asset-url-input" aria-label="Use image URL">${iconSvg('link')}</button>
+        </div>
+        ${showUrlField ? `<div class="asset-popover__url-inline"><input class="asset-popover__input" id="asset-url-input" type="url" value="${escapeHtml(urlValue)}" placeholder="https://example.com/image.jpg" /><button class="icon-action icon-action--primary" type="button" data-asset-action="apply-url" aria-label="Apply image URL">${iconSvg('check')}</button></div>` : ''}
+        <div class="asset-popover__footer">
+          <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Done</button>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="asset-popover__body">
+      <div class="asset-popover__title-wrap">
+        <h3 class="asset-popover__title" id="asset-title">Beauty image</h3>
+      </div>
+      ${assetPreviewMarkup()}
+      <div class="asset-popover__icon-actions">
+        <button class="icon-action" type="button" data-asset-action="upload-image" aria-label="Upload local image">${iconSvg('image')}</button>
+        <button class="icon-action ${showUrlField ? 'icon-action--primary' : ''}" type="button" data-asset-action="toggle-url:asset-url-input" aria-label="Use image URL">${iconSvg('link')}</button>
+      </div>
+      ${showUrlField ? `<div class="asset-popover__url-inline"><input class="asset-popover__input" id="asset-url-input" type="url" value="${escapeHtml(editDraft.beautyWithPurpose.image || '')}" placeholder="https://example.com/image.jpg" /><button class="icon-action icon-action--primary" type="button" data-asset-action="apply-url" aria-label="Apply image URL">${iconSvg('check')}</button></div>` : ''}
+      <div class="asset-popover__footer">
+        <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Done</button>
+      </div>
+    </div>
+  `;
+}
+
+function positionAssetPopover() {
+  if (!assetModalState.open || !assetModalState.anchor) return;
+  const popover = document.getElementById('asset-modal');
+  const panel = document.getElementById('modal-panel');
+  const popoverPanel = document.getElementById('asset-panel');
+  if (!popover || !panel || !popoverPanel) return;
+  const panelRect = panel.getBoundingClientRect();
+  const anchorRect = assetModalState.anchor;
+  const panelWidth = Math.min(360, panelRect.width - 32);
+  let left = anchorRect.left - panelRect.left + panel.scrollLeft;
+  left = Math.max(16, Math.min(left, panel.scrollWidth - panelWidth - 16));
+  const top = anchorRect.bottom - panelRect.top + panel.scrollTop + 10;
+  popoverPanel.style.width = `${panelWidth}px`;
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+function openAssetModal(kind, trigger, galleryIndex = null) {
+  if (!editDraft || !trigger) return;
+  syncDraftFromForm();
+  assetModalState.open = true;
+  assetModalState.kind = kind;
+  assetModalState.galleryIndex = galleryIndex;
+  assetModalState.tempPosition = editDraft.media.coverPosition ?? 50;
+  assetModalState.anchor = trigger.getBoundingClientRect();
+  assetModalState.urlTarget = '';
+  assetModalState.flagSearch = '';
+  document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+  document.getElementById('asset-modal').classList.add('open');
+  document.getElementById('asset-modal').setAttribute('aria-hidden', 'false');
+  positionAssetPopover();
+}
+
+function closeAssetModal() {
+  assetModalState.open = false;
+  assetModalState.kind = '';
+  assetModalState.galleryIndex = null;
+  assetModalState.anchor = null;
+  assetModalState.urlTarget = '';
+  assetModalState.flagSearch = '';
+  document.getElementById('asset-modal').classList.remove('open');
+  document.getElementById('asset-modal').setAttribute('aria-hidden', 'true');
+  document.getElementById('asset-modal-content').innerHTML = '';
+}
+
+async function applyAssetUrl() {
+  const url = document.getElementById('asset-url-input')?.value.trim();
+  if (!editDraft) return;
+  if (!url) {
+    editStatus = 'Please enter an image URL first.';
+    renderActiveProfile();
+    return;
+  }
+
+  try {
+    await loadImage(url);
+  } catch (error) {
+    editStatus = 'That image URL could not be loaded.';
+    renderActiveProfile();
+    return;
+  }
+
+  if (assetModalState.kind === 'cover-change') editDraft.media.coverImage = url;
+  if (assetModalState.kind === 'beauty-image') editDraft.beautyWithPurpose.image = url;
+  if (assetModalState.kind === 'gallery-add' && url) editDraft.media.gallery.push({ src: url, title: '', description: '' });
+  if (assetModalState.kind === 'gallery-change' && assetModalState.galleryIndex != null) editDraft.media.gallery[assetModalState.galleryIndex].src = url;
+
+  editStatus = 'Image updated.';
+  closeAssetModal();
+  renderActiveProfile();
+}
+
+async function applyAvatarAssets() {
+  if (!editDraft) return;
+  const avatarUrl = document.getElementById('asset-avatar-url-input')?.value.trim() || '';
+  const flagUrl = document.getElementById('asset-flag-url-input')?.value.trim() || '';
+  try {
+    if (avatarUrl) await loadImage(avatarUrl);
+    if (flagUrl) await loadImage(flagUrl);
+  } catch (error) {
+    editStatus = 'One of the avatar image URLs could not be loaded.';
+    renderActiveProfile();
+    return;
+  }
+  editDraft.media.avatarImage = avatarUrl || editDraft.media.avatarImage || '';
+  editDraft.media.flagImage = flagUrl || editDraft.media.flagImage || '';
+  editStatus = 'Avatar updated.';
+  closeAssetModal();
+  renderActiveProfile();
+}
+
+function applyCoverPosition() {
+  if (!editDraft) return;
+  const slider = document.getElementById('cover-position-slider');
+  editDraft.media.coverPosition = slider ? Number(slider.value) : 50;
+  editStatus = 'Cover position updated.';
+  closeAssetModal();
+  renderActiveProfile();
+}
+
+async function handleFileUpload(files) {
+  if (!editDraft || !pendingUpload || !files.length) return;
+  syncDraftFromForm();
+  if (pendingUpload.kind === 'cover') {
+    editDraft.media.coverImage = await optimizeImageFile(files[0], { maxWidth: 1600, quality: 0.84 });
+    editStatus = 'Cover image updated.';
+  }
+  if (pendingUpload.kind === 'avatar') {
+    editDraft.media.avatarImage = await optimizeImageFile(files[0], { maxWidth: 640, quality: 0.9 });
+    editStatus = 'Avatar updated.';
+  }
+  if (pendingUpload.kind === 'flag') {
+    editDraft.media.flagImage = await optimizeImageFile(files[0], { maxWidth: 240, quality: 0.92 });
+    editStatus = 'Flag badge updated.';
+  }
+  if (pendingUpload.kind === 'gallery-add') {
+    const images = [];
+    for (const file of files) {
+      images.push({ src: await optimizeImageFile(file, { maxWidth: 1200, quality: 0.84 }), title: '', description: '' });
+    }
+    editDraft.media.gallery.push(...images);
+    editStatus = `${images.length} image${images.length > 1 ? 's' : ''} added.`;
+  }
+  if (pendingUpload.kind === 'gallery-change' && pendingUpload.index != null) {
+    editDraft.media.gallery[pendingUpload.index].src = await optimizeImageFile(files[0], { maxWidth: 1200, quality: 0.84 });
+    editStatus = 'Gallery image updated.';
+  }
+  if (pendingUpload.kind === 'beauty-image') {
+    editDraft.beautyWithPurpose.image = await optimizeImageFile(files[0], { maxWidth: 1400, quality: 0.84 });
+    editStatus = 'Beauty With A Purpose image updated.';
+  }
+  pendingUpload = null;
+  closeAssetModal();
+  renderActiveProfile();
+}
+
+function triggerUpload(kind, index = null) {
+  pendingUpload = { kind, index };
+  const map = {
+    cover: 'cover-upload-input',
+    avatar: 'avatar-upload-input',
+    flag: 'flag-upload-input',
+    'gallery-add': 'gallery-upload-input',
+    'gallery-change': 'gallery-upload-input',
+    'beauty-image': 'beauty-image-upload-input'
+  };
+  const input = document.getElementById(map[kind]);
+  if (input) input.click();
+}
+
+function handleModalActionClick(event) {
+  const button = event.target.closest('[data-action]');
+  if (!button) return;
+  const action = button.dataset.action;
+  if (action === 'start-edit') startEditMode();
+  if (action === 'cancel-edit') cancelEditMode();
+  if (action === 'save-edit') saveEditMode();
+}
+
+function handleProfileContentClick(event) {
+  const button = event.target.closest('[data-action]');
+  if (!button || !editDraft) return;
+  syncDraftFromForm();
+  const action = button.dataset.action;
+
+  if (action === 'cover-change') openAssetModal('cover-change', button);
+  if (action === 'cover-reposition') openAssetModal('cover-reposition', button);
+  if (action === 'avatar-change') openAssetModal('avatar', button);
+  if (action === 'gallery-add') openAssetModal('gallery-add', button);
+  if (action.startsWith('gallery-change:')) openAssetModal('gallery-change', button, Number(action.split(':')[1]));
+  if (action.startsWith('gallery-remove:')) {
+    editDraft.media.gallery.splice(Number(action.split(':')[1]), 1);
+    editStatus = 'Gallery image removed.';
+    renderActiveProfile();
+  }
+  if (action === 'beauty-image') openAssetModal('beauty-image', button);
+  if (action === 'beauty-video') {
+    const field = document.querySelector('[name="beauty.video"]');
+    if (field) field.focus();
+  }
+}
+
+async function handleAssetModalClick(event) {
+  const button = event.target.closest('[data-asset-action]');
+  if (!button) return;
+  const action = button.dataset.assetAction;
+  if (action === 'close') closeAssetModal();
+  if (action === 'apply-url') await applyAssetUrl();
+  if (action === 'apply-avatar') await applyAvatarAssets();
+  if (action === 'apply-reposition') applyCoverPosition();
+  if (action.startsWith('toggle-url:')) {
+    assetModalState.urlTarget = assetModalState.urlTarget === action.split(':')[1] ? '' : action.split(':')[1];
+    document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+    positionAssetPopover();
+  }
+  if (action.startsWith('select-flag:')) {
+    const selected = FLAG_GALLERY_OPTIONS.find(option => option.id === action.split(':')[1]);
+    if (selected) {
+      editDraft.media.flagImage = selected.src;
+      editStatus = `${selected.country} flag selected.`;
+      document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+      renderActiveProfile();
+      positionAssetPopover();
+    }
+  }
+  if (action === 'upload-image') {
+    if (assetModalState.kind === 'cover-change') triggerUpload('cover');
+    if (assetModalState.kind === 'gallery-add') triggerUpload('gallery-add');
+    if (assetModalState.kind === 'gallery-change') triggerUpload('gallery-change', assetModalState.galleryIndex);
+    if (assetModalState.kind === 'beauty-image') triggerUpload('beauty-image');
+  }
+  if (action === 'upload-avatar-image') triggerUpload('avatar');
+  if (action === 'upload-flag-image') triggerUpload('flag');
+}
+
+function handleAssetModalInput(event) {
+  if (event.target.id === 'cover-position-slider') {
+    if (!editDraft) return;
+    editDraft.media.coverPosition = Number(event.target.value);
+    document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+    positionAssetPopover();
+  }
+  if (event.target.id === 'flag-search-input') {
+    assetModalState.flagSearch = event.target.value || '';
+    document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+    positionAssetPopover();
+  }
+}
+
+function handleUploadInput(event) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+  handleFileUpload(files).catch(error => {
+    editStatus = error.message || 'Upload failed.';
+    closeAssetModal();
+    renderActiveProfile();
+  }).finally(() => {
+    event.target.value = '';
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  applyStoredContestantOverrides();
   renderGrid(contestants);
 
-  document.getElementById('search-input').addEventListener('input', () => {
-    renderGrid(getFiltered());
+  document.getElementById('search-input').addEventListener('input', () => renderGrid(getFiltered()));
+  document.getElementById('filter-region').addEventListener('change', () => renderGrid(getFiltered()));
+  document.getElementById('filter-language').addEventListener('change', () => renderGrid(getFiltered()));
+
+  document.getElementById('modal-overlay').addEventListener('click', closeProfile);
+  document.getElementById('modal-content').addEventListener('click', handleModalActionClick);
+  document.getElementById('modal-content').addEventListener('click', handleProfileContentClick);
+
+  document.getElementById('asset-modal-content').addEventListener('click', handleAssetModalClick);
+  document.getElementById('asset-modal-content').addEventListener('input', handleAssetModalInput);
+
+  document.getElementById('cover-upload-input').addEventListener('change', handleUploadInput);
+  document.getElementById('avatar-upload-input').addEventListener('change', handleUploadInput);
+  document.getElementById('flag-upload-input').addEventListener('change', handleUploadInput);
+  document.getElementById('gallery-upload-input').addEventListener('change', handleUploadInput);
+  document.getElementById('beauty-image-upload-input').addEventListener('change', handleUploadInput);
+
+  document.getElementById('modal-panel').addEventListener('scroll', () => {
+    if (assetModalState.open) closeAssetModal();
   });
-  document.getElementById('filter-region').addEventListener('change', () => {
-    renderGrid(getFiltered());
+  window.addEventListener('resize', () => {
+    if (assetModalState.open) positionAssetPopover();
   });
-  document.getElementById('filter-language').addEventListener('change', () => {
-    renderGrid(getFiltered());
+  document.addEventListener('mousedown', event => {
+    if (!assetModalState.open) return;
+    const popover = document.getElementById('asset-panel');
+    const triggerZone = event.target.closest('[data-action="cover-change"], [data-action="cover-reposition"], [data-action="avatar-change"], [data-action="gallery-add"], [data-action^="gallery-change:"], [data-action="beauty-image"]');
+    if (popover?.contains(event.target) || triggerZone) return;
+    closeAssetModal();
   });
 
-  document.getElementById('modal-close').addEventListener('click', closeProfile);
-  document.getElementById('modal-overlay').addEventListener('click', closeProfile);
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeProfile();
+  document.addEventListener('keydown', event => {
+    const profileOpen = document.getElementById('profile-modal').classList.contains('open');
+    const assetOpen = document.getElementById('asset-modal').classList.contains('open');
+    if (event.key !== 'Escape') return;
+    if (assetOpen) {
+      closeAssetModal();
+      return;
+    }
+    if (!profileOpen) return;
+    if (isEditing()) {
+      cancelEditMode();
+      return;
+    }
+    closeProfile();
   });
 });
