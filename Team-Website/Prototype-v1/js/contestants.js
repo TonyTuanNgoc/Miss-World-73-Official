@@ -307,6 +307,7 @@ let activeContestantId = null;
 let editDraft = null;
 let editStatus = '';
 let pendingUpload = null;
+let editStatusTimer = null;
 
 const contestants = rawContestants.map(normalizeContestantEntity);
 
@@ -348,6 +349,11 @@ function normalizeContestantEntity(raw) {
       description: raw.project.description,
       image: raw.beautyWithPurpose?.image || '',
       video: raw.beautyWithPurpose?.video || ''
+    },
+    social: {
+      instagram: raw.social?.instagram || '',
+      facebook: raw.social?.facebook || '',
+      threads: raw.social?.threads || ''
     },
     countryGuide: {
       capital: raw.culture.capital,
@@ -421,18 +427,20 @@ function applyStoredContestantOverrides() {
       gallery: (saved.media?.gallery || contestant.media.gallery).map(normalizeGalleryItem)
     };
     contestant.beautyWithPurpose = deepClone(saved.beautyWithPurpose || contestant.beautyWithPurpose);
+    contestant.social = deepClone(saved.social || contestant.social);
     contestant.countryGuide = deepClone(saved.countryGuide || contestant.countryGuide);
   });
 }
 
 function persistContestant(contestant) {
   const overrides = getContestantOverrides();
-  overrides[contestant.id] = deepClone({
-    profile: contestant.profile,
-    media: contestant.media,
-    beautyWithPurpose: contestant.beautyWithPurpose,
-    countryGuide: contestant.countryGuide
-  });
+    overrides[contestant.id] = deepClone({
+      profile: contestant.profile,
+      media: contestant.media,
+      beautyWithPurpose: contestant.beautyWithPurpose,
+      social: contestant.social,
+      countryGuide: contestant.countryGuide
+    });
   saveContestantOverrides(overrides);
 }
 
@@ -469,6 +477,46 @@ function joinLines(items) {
 
 function buildListItems(items) {
   return items.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+}
+
+function normalizeUrl(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:')) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed.replace(/^\/+/, '')}`;
+}
+
+function getSocialHandle(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    return parts[0] || parsed.hostname.replace(/^www\./, '');
+  } catch (error) {
+    return url.replace(/^@/, '').trim();
+  }
+}
+
+function buildSocialLinkMarkup(contestant) {
+  const links = [
+    { key: 'instagram', label: 'Instagram', url: contestant.social?.instagram || '' },
+    { key: 'facebook', label: 'Facebook', url: contestant.social?.facebook || '' },
+    { key: 'threads', label: 'Threads', url: contestant.social?.threads || '' }
+  ].filter(item => item.url);
+
+  if (!links.length) return '';
+
+  return `
+    <div class="profile-social-links">
+      ${links.map(item => `
+        <a class="profile-social-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
+          <span class="profile-social-link__icon">${iconSvg(item.key)}</span>
+          <span class="profile-social-link__label">${escapeHtml(getSocialHandle(item.url))}</span>
+        </a>
+      `).join('')}
+    </div>
+  `;
 }
 
 function cssUrl(url) {
@@ -558,7 +606,7 @@ function getAvatarMarkup(contestant, options = {}) {
 
 function buildCoverStyle(contestant) {
   const position = contestant.media.coverPosition ?? 50;
-  return `background-image:${cssUrl(getCoverImage(contestant))}; background-position:center ${position}%;`;
+  return `background-image:${cssUrl(getCoverImage(contestant))}; background-position:center ${position}%; background-size:cover; background-repeat:no-repeat;`;
 }
 
 function iconSvg(kind) {
@@ -568,6 +616,9 @@ function iconSvg(kind) {
     close: '<path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
     image: '<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M20 16l-4.5-4.5L9 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
     link: '<path d="M10 14l4-4M8.5 16.5l-2 2a3 3 0 1 1-4.2-4.2l2-2M15.5 7.5l2-2a3 3 0 1 1 4.2 4.2l-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    instagram: '<rect x="5" y="5" width="14" height="14" rx="4" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.3" stroke="currentColor" stroke-width="1.6"/><circle cx="16.8" cy="7.4" r="1" fill="currentColor"/>',
+    facebook: '<path d="M13.5 20v-7h2.4l.4-3h-2.8V8.2c0-.9.3-1.5 1.6-1.5h1.4V4.1c-.2 0-1-.1-2-.1-2 0-3.4 1.2-3.4 3.5V10H9v3h2.2v7h2.3Z" fill="currentColor"/>',
+    threads: '<path d="M15.6 10.1c-.1-2.5-1.6-3.8-4.3-3.8-2.9 0-4.8 1.9-4.8 4.8 0 3.6 2.3 6 5.8 6 2.3 0 4-.9 5.1-2.8l-1.9-1c-.7 1.1-1.7 1.6-3 1.6-2 0-3.4-1.4-3.5-3.5.7.8 1.8 1.2 3.2 1.2 2.3 0 3.6-.9 3.4-2.5Zm-4.2.8c-1.2 0-2.1-.5-2.6-1.4.5-.8 1.3-1.2 2.4-1.2 1.3 0 2.1.6 2.1 1.4 0 .8-.7 1.2-1.9 1.2Z" fill="currentColor"/>',
     move: '<path d="M12 4v16M4 12h16M8 8l4-4 4 4M8 16l4 4 4-4M16 8l4 4-4 4M8 8l-4 4 4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
     plus: '<path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
     trash: '<path d="M5 7h14M10 11v5M14 11v5M8 7l1-2h6l1 2M7 7l1 12h8l1-12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -733,22 +784,26 @@ function buildBeautyMedia(contestant) {
 
 function buildProfile(contestant) {
   const editing = isEditing();
-  const { profile, media, beautyWithPurpose: beauty, countryGuide } = contestant;
+  const { profile, beautyWithPurpose: beauty, countryGuide } = contestant;
   return `
     ${editing && editStatus ? `<div class="profile-edit-status">${escapeHtml(editStatus)}</div>` : ''}
     <div class="notion-page">
-      <section class="notion-cover" style="${buildCoverStyle(contestant)}">
-        ${editing ? `
-          <div class="notion-cover__controls">
-            ${buildIconButton('cover-change', 'image', 'Change cover image')}
-            ${buildIconButton('cover-reposition', 'move', 'Reposition cover image')}
-          </div>
-        ` : ''}
+      <section class="notion-cover">
+        <div class="notion-cover__media" style="${buildCoverStyle(contestant)}"></div>
+        <div class="notion-cover__shade"></div>
+        <div class="notion-cover__toolbar">
+          <div class="notion-cover__edit" data-role="modal-actions"></div>
+          ${editing ? `
+            <div class="notion-cover__controls">
+              ${buildIconButton('cover-change', 'image', 'Change cover image')}
+              ${buildIconButton('cover-reposition', 'move', 'Reposition cover image')}
+            </div>
+          ` : ''}
+        </div>
       </section>
 
       <div class="notion-page__content">
         <section class="profile-identity-card">
-          <div class="profile-identity-card__actions" data-role="modal-actions"></div>
           <div class="profile-identity-card__main">
             <div class="notion-avatar">
               ${getAvatarMarkup(contestant, { showControls: true })}
@@ -766,9 +821,23 @@ function buildProfile(contestant) {
                   <p class="notion-header__subtitle">${escapeHtml(profile.tagline)}</p>
                 `
               }
+              ${buildSocialLinkMarkup(contestant)}
             </div>
           </div>
         </section>
+
+        ${editing ? `
+          <section class="profile-section profile-section--notion">
+            <div class="profile-section__heading">
+              <h3 class="profile-section__title">Social Media</h3>
+            </div>
+            <div class="notion-form-stack">
+              ${buildField('Instagram Link', 'social.instagram', contestant.social.instagram || '', { placeholder: 'https://instagram.com/username' })}
+              ${buildField('Facebook Link', 'social.facebook', contestant.social.facebook || '', { placeholder: 'https://facebook.com/name' })}
+              ${buildField('Threads Link', 'social.threads', contestant.social.threads || '', { placeholder: 'https://threads.net/@username' })}
+            </div>
+          </section>
+        ` : ''}
 
         <section class="profile-section profile-section--notion">
           <div class="profile-section__heading">
@@ -894,6 +963,23 @@ function renderActiveProfile() {
   if (!contestant || !content) return;
   content.innerHTML = buildProfile(contestant);
   renderModalActions();
+  syncEditStatusTimer();
+}
+
+function clearEditStatusTimer() {
+  if (editStatusTimer) {
+    clearTimeout(editStatusTimer);
+    editStatusTimer = null;
+  }
+}
+
+function syncEditStatusTimer() {
+  clearEditStatusTimer();
+  if (!editStatus || !isEditing()) return;
+  editStatusTimer = setTimeout(() => {
+    editStatus = '';
+    if (activeContestantId && isEditing()) renderActiveProfile();
+  }, 4200);
 }
 
 function getFieldValue(name) {
@@ -916,6 +1002,9 @@ function syncDraftFromForm() {
   editDraft.beautyWithPurpose.title = getFieldValue('beauty.title');
   editDraft.beautyWithPurpose.description = getFieldValue('beauty.description');
   editDraft.beautyWithPurpose.video = getFieldValue('beauty.video');
+  editDraft.social.instagram = normalizeUrl(getFieldValue('social.instagram'));
+  editDraft.social.facebook = normalizeUrl(getFieldValue('social.facebook'));
+  editDraft.social.threads = normalizeUrl(getFieldValue('social.threads'));
 
   editDraft.countryGuide.capital = getFieldValue('country.capital');
   editDraft.countryGuide.traditions = parseLines(getFieldValue('country.traditions'));
@@ -944,12 +1033,14 @@ function openProfile(id) {
   const modal = document.getElementById('profile-modal');
   const panel = document.getElementById('modal-panel');
   panel.scrollTop = 0;
+  clearEditStatusTimer();
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
 }
 
 function closeProfile() {
+  clearEditStatusTimer();
   document.getElementById('profile-modal').classList.remove('open');
   document.getElementById('profile-modal').setAttribute('aria-hidden', 'true');
   activeContestantId = null;
@@ -969,6 +1060,7 @@ function startEditMode() {
 }
 
 function cancelEditMode() {
+  clearEditStatusTimer();
   editDraft = null;
   editStatus = '';
   closeAssetModal();
@@ -982,8 +1074,10 @@ function saveEditMode() {
   contestant.profile = deepClone(editDraft.profile);
   contestant.media = deepClone(editDraft.media);
   contestant.beautyWithPurpose = deepClone(editDraft.beautyWithPurpose);
+  contestant.social = deepClone(editDraft.social);
   contestant.countryGuide = deepClone(editDraft.countryGuide);
   persistContestant(contestant);
+  clearEditStatusTimer();
   editDraft = null;
   editStatus = '';
   renderGrid(getFiltered());
@@ -1189,6 +1283,17 @@ function positionAssetPopover() {
   popover.style.top = `${top}px`;
 }
 
+function updateCoverVisuals() {
+  const coverMedia = document.querySelector('.notion-cover__media');
+  if (coverMedia && editDraft) {
+    coverMedia.setAttribute('style', buildCoverStyle(editDraft));
+  }
+  const preview = document.querySelector('.asset-popover__cover-preview');
+  if (preview && editDraft) {
+    preview.setAttribute('style', buildCoverStyle(editDraft));
+  }
+}
+
 function openAssetModal(kind, trigger, galleryIndex = null) {
   if (!editDraft || !trigger) return;
   syncDraftFromForm();
@@ -1218,7 +1323,7 @@ function closeAssetModal() {
 }
 
 async function applyAssetUrl() {
-  const url = document.getElementById('asset-url-input')?.value.trim();
+  const url = normalizeUrl(document.getElementById('asset-url-input')?.value.trim());
   if (!editDraft) return;
   if (!url) {
     editStatus = 'Please enter an image URL first.';
@@ -1240,14 +1345,15 @@ async function applyAssetUrl() {
   if (assetModalState.kind === 'gallery-change' && assetModalState.galleryIndex != null) editDraft.media.gallery[assetModalState.galleryIndex].src = url;
 
   editStatus = 'Image updated.';
+  updateCoverVisuals();
   closeAssetModal();
   renderActiveProfile();
 }
 
 async function applyAvatarAssets() {
   if (!editDraft) return;
-  const avatarUrl = document.getElementById('asset-avatar-url-input')?.value.trim() || '';
-  const flagUrl = document.getElementById('asset-flag-url-input')?.value.trim() || '';
+  const avatarUrl = normalizeUrl(document.getElementById('asset-avatar-url-input')?.value.trim()) || '';
+  const flagUrl = normalizeUrl(document.getElementById('asset-flag-url-input')?.value.trim()) || '';
   try {
     if (avatarUrl) await loadImage(avatarUrl);
     if (flagUrl) await loadImage(flagUrl);
@@ -1278,6 +1384,7 @@ async function handleFileUpload(files) {
   if (pendingUpload.kind === 'cover') {
     editDraft.media.coverImage = await optimizeImageFile(files[0], { maxWidth: 1600, quality: 0.84 });
     editStatus = 'Cover image updated.';
+    updateCoverVisuals();
   }
   if (pendingUpload.kind === 'avatar') {
     editDraft.media.avatarImage = await optimizeImageFile(files[0], { maxWidth: 640, quality: 0.9 });
@@ -1391,8 +1498,7 @@ function handleAssetModalInput(event) {
   if (event.target.id === 'cover-position-slider') {
     if (!editDraft) return;
     editDraft.media.coverPosition = Number(event.target.value);
-    document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
-    positionAssetPopover();
+    updateCoverVisuals();
   }
   if (event.target.id === 'flag-search-input') {
     assetModalState.flagSearch = event.target.value || '';

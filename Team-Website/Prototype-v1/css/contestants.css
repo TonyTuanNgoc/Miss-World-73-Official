@@ -426,6 +426,18 @@
   border: 1px solid rgba(201,168,76,0.18);
   color: var(--champagne);
   font-size: 12px;
+  animation: profileToastIn 0.22s ease;
+}
+
+@keyframes profileToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .profile-hero {
@@ -1611,25 +1623,39 @@
   position: relative;
   min-height: 280px;
   margin: -42px 0 0;
-  background-size: cover;
-  background-position: center;
   overflow: hidden;
 }
 
-.notion-cover::before {
-  content: '';
+.notion-cover__media,
+.notion-cover__shade {
   position: absolute;
   inset: 0;
+}
+
+.notion-cover__media {
+  z-index: 0;
+}
+
+.notion-cover__shade {
+  z-index: 1;
   background:
     linear-gradient(180deg, rgba(8,12,19,0.1) 0%, rgba(8,12,19,0.18) 34%, rgba(8,12,19,0.72) 100%),
     linear-gradient(90deg, rgba(0,0,0,0.06) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.12) 100%);
 }
 
-.notion-cover__controls {
+.notion-cover__toolbar {
   position: absolute;
-  right: 28px;
-  bottom: 22px;
+  top: 18px;
+  right: 18px;
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.notion-cover__edit,
+.notion-cover__controls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2266,9 +2292,13 @@
     margin-top: -26px;
   }
 
+  .notion-cover__toolbar {
+    top: 14px;
+    right: 14px;
+  }
+
   .notion-cover__controls {
-    right: 18px;
-    bottom: 18px;
+    justify-content: flex-end;
   }
 
   .notion-avatar-row {
@@ -2351,15 +2381,6 @@
   box-shadow: 0 22px 44px rgba(0,0,0,0.22);
 }
 
-.profile-identity-card__actions {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .profile-identity-card__main {
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr);
@@ -2375,6 +2396,7 @@
 .profile-social-copy__fields {
   display: grid;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
 .notion-avatar {
@@ -2454,6 +2476,40 @@
 .profile-social-copy .notion-field__control[name="profile.tagline"] {
   min-height: 84px;
   color: rgba(255,255,255,0.74);
+}
+
+.profile-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.profile-social-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255,255,255,0.8);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 1.4;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.profile-social-link:hover {
+  color: var(--white);
+  transform: translateY(-1px);
+}
+
+.profile-social-link__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--champagne);
+}
+
+.profile-social-link__icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .asset-popover {
@@ -2772,6 +2828,12 @@
 
   .profile-social-copy {
     padding-right: 0;
+  }
+
+  .profile-social-links {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .notion-avatar,
