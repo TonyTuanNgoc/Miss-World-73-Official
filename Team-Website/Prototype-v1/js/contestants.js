@@ -293,6 +293,14 @@ const COUNTRY_CODES = {
   'south-africa': 'za',
   brazil: 'br'
 };
+const FLAG_LIBRARY_CODES = ["ad","ae","af","ag","ai","al","am","ao","aq","ar","as","at","au","aw","ax","az","ba","bb","bd","be","bf","bg","bh","bi","bj","bl","bm","bn","bo","bq","br","bs","bt","bv","bw","by","bz","ca","cc","cd","cf","cg","ch","ci","ck","cl","cm","cn","co","cp","cr","cu","cv","cw","cx","cy","cz","de","dg","dj","dk","dm","do","dz","ea","ec","ee","eg","eh","er","es","et","fi","fj","fk","fm","fo","fr","ga","gb","gd","ge","gf","gg","gh","gi","gl","gm","gn","gp","gq","gr","gs","gt","gu","gw","gy","hk","hm","hn","hr","ht","hu","ic","id","ie","il","im","in","io","iq","ir","is","it","je","jm","jo","jp","ke","kg","kh","ki","km","kn","kp","kr","kw","ky","kz","la","lb","lc","li","lk","lr","ls","lt","lu","lv","ly","ma","mc","md","me","mf","mg","mh","mk","ml","mm","mn","mo","mp","mq","mr","ms","mt","mu","mv","mw","mx","my","mz","na","nc","ne","nf","ng","ni","nl","no","np","nr","nu","nz","om","pa","pe","pf","pg","ph","pk","pl","pm","pn","pr","ps","pt","pw","py","qa","re","ro","rs","ru","rw","sa","sb","sc","sd","se","sg","sh","si","sj","sk","sl","sm","sn","so","sr","ss","st","sv","sx","sy","sz","tc","td","tf","tg","th","tj","tk","tl","tm","tn","to","tr","tt","tv","tw","tz","ua","ug","um","us","uy","uz","va","vc","ve","vg","vi","vn","vu","wf","ws","xk","ye","yt","za","zm","zw"];
+const FLAG_NAME_OVERRIDES = {
+  cp: 'Clipperton Island',
+  dg: 'Diego Garcia',
+  ea: 'Ceuta & Melilla',
+  ic: 'Canary Islands',
+  xk: 'Kosovo'
+};
 const assetModalState = {
   open: false,
   kind: '',
@@ -300,7 +308,8 @@ const assetModalState = {
   tempPosition: 50,
   anchor: null,
   urlTarget: '',
-  flagSearch: ''
+  flagSearch: '',
+  parentKind: ''
 };
 
 let activeContestantId = null;
@@ -341,6 +350,7 @@ function normalizeContestantEntity(raw) {
       coverImage: raw.media?.coverImage || raw.media?.backgroundImage || '',
       coverPosition: raw.media?.coverPosition ?? 50,
       avatarImage: raw.media?.avatarImage || '',
+      flagCode: raw.media?.flagCode || '',
       flagImage: raw.media?.flagImage || '',
       gallery: (raw.media?.gallery || []).map(normalizeGalleryItem)
     },
@@ -351,9 +361,7 @@ function normalizeContestantEntity(raw) {
       video: raw.beautyWithPurpose?.video || ''
     },
     social: {
-      instagram: raw.social?.instagram || '',
-      facebook: raw.social?.facebook || '',
-      threads: raw.social?.threads || ''
+      instagram: raw.social?.instagram || ''
     },
     countryGuide: {
       capital: raw.culture.capital,
@@ -498,23 +506,61 @@ function getSocialHandle(url) {
   }
 }
 
-function buildSocialLinkMarkup(contestant) {
-  const links = [
-    { key: 'instagram', label: 'Instagram', url: contestant.social?.instagram || '' },
-    { key: 'facebook', label: 'Facebook', url: contestant.social?.facebook || '' },
-    { key: 'threads', label: 'Threads', url: contestant.social?.threads || '' }
-  ].filter(item => item.url);
+const regionDisplayNames = typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function'
+  ? new Intl.DisplayNames(['en'], { type: 'region' })
+  : null;
 
-  if (!links.length) return '';
+function codeToFlagEmoji(code) {
+  return String(code || '')
+    .trim()
+    .toUpperCase()
+    .replace(/./g, letter => String.fromCodePoint(127397 + letter.charCodeAt(0)));
+}
+
+function getFlagOptionName(code) {
+  const normalized = String(code || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (FLAG_NAME_OVERRIDES[normalized]) return FLAG_NAME_OVERRIDES[normalized];
+
+  try {
+    const label = regionDisplayNames?.of(normalized.toUpperCase()) || '';
+    if (!label || label.toUpperCase() === normalized.toUpperCase()) return '';
+    return label;
+  } catch (error) {
+    return '';
+  }
+}
+
+const FLAG_LIBRARY_OPTIONS = FLAG_LIBRARY_CODES
+  .map(code => ({
+    code,
+    name: getFlagOptionName(code),
+    emoji: codeToFlagEmoji(code)
+  }))
+  .filter(option => option.name && option.emoji)
+  .sort((left, right) => left.name.localeCompare(right.name));
+
+function getFlagLibraryOption(code) {
+  const normalized = String(code || '').trim().toLowerCase();
+  return FLAG_LIBRARY_OPTIONS.find(option => option.code === normalized) || null;
+}
+
+function getFilteredFlagOptions(query = '') {
+  const normalized = String(query || '').trim().toLowerCase();
+  if (!normalized) return FLAG_LIBRARY_OPTIONS;
+  return FLAG_LIBRARY_OPTIONS.filter(option => option.name.toLowerCase().includes(normalized));
+}
+
+function buildSocialLinkMarkup(contestant) {
+  const instagramUrl = contestant.social?.instagram || '';
+  if (!instagramUrl) return '';
 
   return `
     <div class="profile-social-links">
-      ${links.map(item => `
-        <a class="profile-social-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
-          <span class="profile-social-link__icon">${iconSvg(item.key)}</span>
-          <span class="profile-social-link__label">${escapeHtml(getSocialHandle(item.url))}</span>
-        </a>
-      `).join('')}
+      <a class="profile-social-link" href="${escapeHtml(instagramUrl)}" target="_blank" rel="noopener noreferrer">
+        <span class="profile-social-link__icon">${iconSvg('instagram')}</span>
+        <span class="profile-social-link__label">${escapeHtml(getSocialHandle(instagramUrl))}</span>
+      </a>
     </div>
   `;
 }
@@ -554,43 +600,70 @@ function getGeneratedFlagBackground(contestant) {
   return (builders[contestant.id] || (() => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#003876"/><stop offset="100%" stop-color="#C9A84C"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/></svg>`)))();
 }
 
-function getBuiltInFlagBadgeSource(id) {
-  const builders = {
-    philippines: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="32" fill="#0038A8"/><rect y="32" width="96" height="32" fill="#CE1126"/><polygon points="0,0 0,64 44,32" fill="#FFFFFF"/><circle cx="12" cy="32" r="6" fill="#FCD116"/></svg>`),
-    india: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="21.33" fill="#FF9933"/><rect y="21.33" width="96" height="21.33" fill="#FFFFFF"/><rect y="42.66" width="96" height="21.34" fill="#138808"/><circle cx="48" cy="32" r="7.5" fill="none" stroke="#1A3C8B" stroke-width="1.8"/></svg>`),
-    france: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="32" height="64" fill="#0055A4"/><rect x="32" width="32" height="64" fill="#FFFFFF"/><rect x="64" width="32" height="64" fill="#EF4135"/></svg>`),
-    'south-africa': () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="32" fill="#DE3831"/><rect y="32" width="96" height="32" fill="#002395"/><polygon points="0,0 32,32 0,64" fill="#000000"/><polyline points="0,6 28,32 0,58" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linejoin="round"/><polyline points="0,8 32,32 0,56" fill="none" stroke="#007A4D" stroke-width="8" stroke-linejoin="round"/></svg>`),
-    brazil: () => svgToDataUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64"><rect width="96" height="64" fill="#009B3A"/><polygon points="48,8 82,32 48,56 14,32" fill="#FFDF00"/><circle cx="48" cy="32" r="11" fill="#002776"/></svg>`)
-  };
-  return (builders[id] || (() => ''))();
-}
-
-const FLAG_GALLERY_OPTIONS = rawContestants.map(contestant => ({
-  id: contestant.id,
-  country: contestant.country,
-  src: getBuiltInFlagBadgeSource(contestant.id)
-})).filter(option => option.src);
-
 function getCoverImage(contestant) {
   return contestant.media.coverImage || getGeneratedFlagBackground(contestant);
 }
 
-function getDefaultFlagBadge(contestant) {
-  return getBuiltInFlagBadgeSource(contestant.id);
+function getDefaultFlagCode(contestant) {
+  return COUNTRY_CODES[contestant.id] || '';
 }
 
-function getFlagBadgeImage(contestant) {
-  return contestant.media.flagImage || getDefaultFlagBadge(contestant);
+function getFlagBadgeData(contestant) {
+  const explicitCode = contestant.media?.flagCode || '';
+  const explicitOption = getFlagLibraryOption(explicitCode);
+  if (explicitOption) {
+    return { type: 'emoji', ...explicitOption };
+  }
+
+  if (contestant.media?.flagImage) {
+    return {
+      type: 'image',
+      src: contestant.media.flagImage,
+      name: contestant.country
+    };
+  }
+
+  const fallbackOption = getFlagLibraryOption(getDefaultFlagCode(contestant));
+  if (fallbackOption) {
+    return { type: 'emoji', ...fallbackOption };
+  }
+
+  return contestant.flag
+    ? { type: 'emoji', code: '', emoji: contestant.flag, name: contestant.country }
+    : null;
+}
+
+function buildFlagBadgeMarkup(contestant, className = 'notion-avatar__flag') {
+  const flagBadge = getFlagBadgeData(contestant);
+  if (!flagBadge) return '';
+  if (flagBadge.type === 'image') {
+    return `<img class="${className}" src="${escapeHtml(flagBadge.src)}" alt="${escapeHtml(flagBadge.name)} flag" />`;
+  }
+  return `<span class="${className} ${className}--emoji" role="img" aria-label="${escapeHtml(flagBadge.name)} flag">${escapeHtml(flagBadge.emoji)}</span>`;
+}
+
+function buildFlagPickerResultsMarkup(contestant) {
+  const currentCode = contestant.media?.flagCode || getDefaultFlagCode(contestant);
+  const options = getFilteredFlagOptions(assetModalState.flagSearch);
+  if (!options.length) {
+    return '<div class="asset-popover__flag-empty">No matching flag found.</div>';
+  }
+
+  return options.map(option => `
+    <button class="asset-popover__flag-option ${currentCode === option.code ? 'is-selected' : ''}" type="button" data-asset-action="select-flag:${option.code}" aria-label="Use ${escapeHtml(option.name)} flag">
+      <span class="asset-popover__flag-option-emoji" role="img" aria-hidden="true">${escapeHtml(option.emoji)}</span>
+      <span>${escapeHtml(option.name)}</span>
+    </button>
+  `).join('');
 }
 
 function getAvatarMarkup(contestant, options = {}) {
-  const flagImage = getFlagBadgeImage(contestant);
   const showControls = options.showControls && isEditing();
   if (contestant.media.avatarImage) {
     return `
       <div class="profile-avatar-stack">
         <img class="notion-avatar__image" src="${escapeHtml(contestant.media.avatarImage)}" alt="${escapeHtml(contestant.profile.name)} avatar" />
-        ${flagImage ? `<img class="notion-avatar__flag" src="${escapeHtml(flagImage)}" alt="${escapeHtml(contestant.country)} flag" />` : ''}
+        ${buildFlagBadgeMarkup(contestant)}
         ${showControls ? `<div class="notion-avatar__controls">${buildIconButton('avatar-change', 'image', 'Edit avatar images')}</div>` : ''}
       </div>
     `;
@@ -598,7 +671,7 @@ function getAvatarMarkup(contestant, options = {}) {
   return `
     <div class="profile-avatar-stack">
       <div class="notion-avatar__fallback">${contestant.flag}</div>
-      ${flagImage ? `<img class="notion-avatar__flag" src="${escapeHtml(flagImage)}" alt="${escapeHtml(contestant.country)} flag" />` : ''}
+      ${buildFlagBadgeMarkup(contestant)}
       ${showControls ? `<div class="notion-avatar__controls">${buildIconButton('avatar-change', 'image', 'Edit avatar images')}</div>` : ''}
     </div>
   `;
@@ -609,6 +682,14 @@ function buildCoverStyle(contestant) {
   return `background-image:${cssUrl(getCoverImage(contestant))}; background-position:center ${position}%; background-size:cover; background-repeat:no-repeat;`;
 }
 
+function buildCoverMediaMarkup(contestant, className = 'notion-cover__media') {
+  const position = contestant.media.coverPosition ?? 50;
+  if (contestant.media.coverImage) {
+    return `<img class="notion-cover__image ${className}" src="${escapeHtml(contestant.media.coverImage)}" alt="${escapeHtml(contestant.profile.name)} cover" style="object-position:center ${position}%;" />`;
+  }
+  return `<div class="${className} notion-cover__media--placeholder" style="${buildCoverStyle(contestant)}"></div>`;
+}
+
 function iconSvg(kind) {
   const icons = {
     pencil: '<path d="M4 20h4l9.5-9.5-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12.5 6.5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
@@ -617,6 +698,7 @@ function iconSvg(kind) {
     image: '<rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M20 16l-4.5-4.5L9 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
     link: '<path d="M10 14l4-4M8.5 16.5l-2 2a3 3 0 1 1-4.2-4.2l2-2M15.5 7.5l2-2a3 3 0 1 1 4.2 4.2l-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
     instagram: '<rect x="5" y="5" width="14" height="14" rx="4" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.3" stroke="currentColor" stroke-width="1.6"/><circle cx="16.8" cy="7.4" r="1" fill="currentColor"/>',
+    flag: '<path d="M6 4.5v15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 5h10l-2 3 2 3H7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
     facebook: '<path d="M13.5 20v-7h2.4l.4-3h-2.8V8.2c0-.9.3-1.5 1.6-1.5h1.4V4.1c-.2 0-1-.1-2-.1-2 0-3.4 1.2-3.4 3.5V10H9v3h2.2v7h2.3Z" fill="currentColor"/>',
     threads: '<path d="M15.6 10.1c-.1-2.5-1.6-3.8-4.3-3.8-2.9 0-4.8 1.9-4.8 4.8 0 3.6 2.3 6 5.8 6 2.3 0 4-.9 5.1-2.8l-1.9-1c-.7 1.1-1.7 1.6-3 1.6-2 0-3.4-1.4-3.5-3.5.7.8 1.8 1.2 3.2 1.2 2.3 0 3.6-.9 3.4-2.5Zm-4.2.8c-1.2 0-2.1-.5-2.6-1.4.5-.8 1.3-1.2 2.4-1.2 1.3 0 2.1.6 2.1 1.4 0 .8-.7 1.2-1.9 1.2Z" fill="currentColor"/>',
     move: '<path d="M12 4v16M4 12h16M8 8l4-4 4 4M8 16l4 4 4-4M16 8l4 4-4 4M8 8l-4 4 4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -786,10 +868,9 @@ function buildProfile(contestant) {
   const editing = isEditing();
   const { profile, beautyWithPurpose: beauty, countryGuide } = contestant;
   return `
-    ${editing && editStatus ? `<div class="profile-edit-status">${escapeHtml(editStatus)}</div>` : ''}
     <div class="notion-page">
       <section class="notion-cover">
-        <div class="notion-cover__media" style="${buildCoverStyle(contestant)}"></div>
+        ${buildCoverMediaMarkup(contestant)}
         <div class="notion-cover__shade"></div>
         <div class="notion-cover__toolbar">
           <div class="notion-cover__edit" data-role="modal-actions"></div>
@@ -809,35 +890,27 @@ function buildProfile(contestant) {
               ${getAvatarMarkup(contestant, { showControls: true })}
             </div>
             <div class="profile-social-copy">
-              ${editing
-                ? `
-                  <div class="profile-social-copy__fields">
-                    ${buildField('Name', 'profile.name', profile.name, { placeholder: 'Name' })}
-                    ${buildField('Short Bio', 'profile.tagline', profile.tagline, { textarea: true, rows: 3, placeholder: 'Short Bio' })}
-                  </div>
-                `
-                : `
-                  <h1 class="notion-header__title">${escapeHtml(profile.name)}</h1>
-                  <p class="notion-header__subtitle">${escapeHtml(profile.tagline)}</p>
-                `
-              }
-              ${buildSocialLinkMarkup(contestant)}
+              <div class="profile-social-copy__primary">
+                ${editing
+                  ? `
+                    <div class="profile-social-copy__fields">
+                      ${buildField('Name', 'profile.name', profile.name, { placeholder: 'Name' })}
+                      ${buildField('Short Bio', 'profile.tagline', profile.tagline, { textarea: true, rows: 3, placeholder: 'Short Bio' })}
+                    </div>
+                  `
+                  : `
+                    <h1 class="notion-header__title">${escapeHtml(profile.name)}</h1>
+                    <p class="notion-header__subtitle">${escapeHtml(profile.tagline)}</p>
+                  `
+                }
+              </div>
+              <div class="profile-social-inline ${contestant.social?.instagram ? 'profile-social-inline--linked' : ''}">
+                ${buildSocialLinkMarkup(contestant)}
+                ${editing ? `<button class="icon-action icon-action--compact" type="button" data-action="instagram-edit" aria-label="${contestant.social?.instagram ? 'Edit Instagram link' : 'Add Instagram link'}">${iconSvg(contestant.social?.instagram ? 'pencil' : 'instagram')}</button>` : ''}
+              </div>
             </div>
           </div>
         </section>
-
-        ${editing ? `
-          <section class="profile-section profile-section--notion">
-            <div class="profile-section__heading">
-              <h3 class="profile-section__title">Social Media</h3>
-            </div>
-            <div class="notion-form-stack">
-              ${buildField('Instagram Link', 'social.instagram', contestant.social.instagram || '', { placeholder: 'https://instagram.com/username' })}
-              ${buildField('Facebook Link', 'social.facebook', contestant.social.facebook || '', { placeholder: 'https://facebook.com/name' })}
-              ${buildField('Threads Link', 'social.threads', contestant.social.threads || '', { placeholder: 'https://threads.net/@username' })}
-            </div>
-          </section>
-        ` : ''}
 
         <section class="profile-section profile-section--notion">
           <div class="profile-section__heading">
@@ -963,7 +1036,14 @@ function renderActiveProfile() {
   if (!contestant || !content) return;
   content.innerHTML = buildProfile(contestant);
   renderModalActions();
+  renderProfileToast();
   syncEditStatusTimer();
+}
+
+function renderProfileToast() {
+  const host = document.getElementById('profile-toast-host');
+  if (!host) return;
+  host.innerHTML = editStatus ? `<div class="profile-edit-status">${escapeHtml(editStatus)}</div>` : '';
 }
 
 function clearEditStatusTimer() {
@@ -975,11 +1055,11 @@ function clearEditStatusTimer() {
 
 function syncEditStatusTimer() {
   clearEditStatusTimer();
-  if (!editStatus || !isEditing()) return;
+  if (!editStatus || !activeContestantId) return;
   editStatusTimer = setTimeout(() => {
     editStatus = '';
-    if (activeContestantId && isEditing()) renderActiveProfile();
-  }, 4200);
+    renderProfileToast();
+  }, 3000);
 }
 
 function getFieldValue(name) {
@@ -1002,9 +1082,6 @@ function syncDraftFromForm() {
   editDraft.beautyWithPurpose.title = getFieldValue('beauty.title');
   editDraft.beautyWithPurpose.description = getFieldValue('beauty.description');
   editDraft.beautyWithPurpose.video = getFieldValue('beauty.video');
-  editDraft.social.instagram = normalizeUrl(getFieldValue('social.instagram'));
-  editDraft.social.facebook = normalizeUrl(getFieldValue('social.facebook'));
-  editDraft.social.threads = normalizeUrl(getFieldValue('social.threads'));
 
   editDraft.countryGuide.capital = getFieldValue('country.capital');
   editDraft.countryGuide.traditions = parseLines(getFieldValue('country.traditions'));
@@ -1047,6 +1124,7 @@ function closeProfile() {
   editDraft = null;
   editStatus = '';
   closeAssetModal();
+  renderProfileToast();
   document.body.style.overflow = '';
 }
 
@@ -1079,7 +1157,7 @@ function saveEditMode() {
   persistContestant(contestant);
   clearEditStatusTimer();
   editDraft = null;
-  editStatus = '';
+  editStatus = 'Profile saved.';
   renderGrid(getFiltered());
   renderActiveProfile();
 }
@@ -1118,7 +1196,7 @@ async function optimizeImageFile(file, options = {}) {
 function assetPreviewMarkup() {
   if (!editDraft) return '';
   if (assetModalState.kind === 'cover-change' || assetModalState.kind === 'cover-reposition') {
-    return `<div class="asset-popover__cover-preview" style="${buildCoverStyle(editDraft)}"></div>`;
+    return `<div class="asset-popover__cover-preview">${buildCoverMediaMarkup(editDraft, 'asset-popover__cover-media')}</div>`;
   }
   if (assetModalState.kind === 'gallery-add' || assetModalState.kind === 'gallery-change') {
     const item = assetModalState.galleryIndex != null ? editDraft.media.gallery[assetModalState.galleryIndex] : null;
@@ -1151,6 +1229,23 @@ function buildAssetModal() {
   if (!editDraft || !assetModalState.open) return '';
   const showUrlField = assetModalState.urlTarget === 'asset-url-input';
 
+  if (assetModalState.kind === 'instagram') {
+    return `
+      <div class="asset-popover__body">
+        <div class="asset-popover__title-wrap">
+          <h3 class="asset-popover__title" id="asset-title">Instagram</h3>
+        </div>
+        <div class="asset-popover__url-inline asset-popover__url-inline--wide">
+          <input class="asset-popover__input" id="instagram-url-input" type="url" value="${escapeHtml(editDraft.social.instagram || '')}" placeholder="https://instagram.com/username" />
+          <button class="icon-action icon-action--primary" type="button" data-asset-action="apply-instagram" aria-label="Save Instagram link">${iconSvg('check')}</button>
+        </div>
+        <div class="asset-popover__footer">
+          <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Done</button>
+        </div>
+      </div>
+    `;
+  }
+
   if (assetModalState.kind === 'cover-change') {
     return `
       <div class="asset-popover__body">
@@ -1171,12 +1266,23 @@ function buildAssetModal() {
   }
 
   if (assetModalState.kind === 'cover-reposition') {
+    const hasCover = Boolean(editDraft.media.coverImage);
     return `
       <div class="asset-popover__body">
         <div class="asset-popover__title-wrap">
           <h3 class="asset-popover__title" id="asset-title">Reposition cover</h3>
         </div>
-        ${assetPreviewMarkup()}
+        <div class="asset-popover__cover-stack">
+          <div class="asset-popover__cover-original">
+            ${hasCover
+              ? `<img class="asset-popover__cover-original-image" src="${escapeHtml(editDraft.media.coverImage)}" alt="Original uploaded cover" />`
+              : `<div class="asset-popover__empty">Add a cover image first.</div>`
+            }
+          </div>
+          <div class="asset-popover__cover-frame">
+            ${assetPreviewMarkup()}
+          </div>
+        </div>
         <label class="asset-popover__slider-wrap">
           <span>Vertical position</span>
           <input class="asset-popover__slider" id="cover-position-slider" type="range" min="0" max="100" value="${assetModalState.tempPosition}" />
@@ -1193,34 +1299,44 @@ function buildAssetModal() {
     const mainPreview = editDraft.media.avatarImage
       ? `<img class="asset-popover__avatar-preview" src="${escapeHtml(editDraft.media.avatarImage)}" alt="Main avatar preview" />`
       : `<div class="asset-popover__avatar-fallback">${editDraft.flag}</div>`;
-    const flagPreview = getFlagBadgeImage(editDraft)
-      ? `<img class="asset-popover__flag-preview" src="${escapeHtml(getFlagBadgeImage(editDraft))}" alt="${escapeHtml(editDraft.country)} flag" />`
-      : `<div class="asset-popover__flag-fallback">${editDraft.flag}</div>`;
+    const flagPreview = buildFlagBadgeMarkup(editDraft, 'asset-popover__flag-preview');
     return `
       <div class="asset-popover__body">
         <div class="asset-popover__title-wrap">
           <h3 class="asset-popover__title" id="asset-title">Edit Avatar Images</h3>
         </div>
-        <div class="asset-popover__slots">
+        <div class="asset-popover__slots asset-popover__slots--stack">
           ${buildAssetSlot('Main avatar', mainPreview, 'upload-avatar-image', 'asset-avatar-url-input', editDraft.media.avatarImage || '', 'https://example.com/avatar.jpg')}
-          ${buildAssetSlot('Flag badge', flagPreview, 'upload-flag-image', 'asset-flag-url-input', editDraft.media.flagImage || '', 'https://example.com/flag.png')}
         </div>
-        <div class="asset-popover__flag-picker">
-          <input class="asset-popover__search" id="flag-search-input" type="search" value="${escapeHtml(assetModalState.flagSearch)}" placeholder="Search country flag..." />
-          <div class="asset-popover__flag-grid">
-            ${FLAG_GALLERY_OPTIONS
-              .filter(option => option.country.toLowerCase().includes(assetModalState.flagSearch.toLowerCase().trim()))
-              .map(option => `
-                <button class="asset-popover__flag-option ${getFlagBadgeImage(editDraft) === option.src ? 'is-selected' : ''}" type="button" data-asset-action="select-flag:${option.id}" aria-label="Use ${escapeHtml(option.country)} flag">
-                  <img src="${escapeHtml(option.src)}" alt="${escapeHtml(option.country)} flag" />
-                  <span>${escapeHtml(option.country)}</span>
-                </button>
-              `).join('')}
+        <div class="asset-popover__flag-section">
+          <div class="asset-popover__slot-label">Flag badge</div>
+          <div class="asset-popover__flag-inline">
+            <div class="asset-popover__flag-current">${flagPreview}</div>
+            <button class="icon-action" type="button" data-asset-action="open-flag-picker" aria-label="Edit flag badge">${iconSvg('flag')}</button>
           </div>
         </div>
         <div class="asset-popover__footer">
           <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="close">Cancel</button>
           <button class="asset-popover__button" type="button" data-asset-action="apply-avatar">Apply</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (assetModalState.kind === 'flag-picker') {
+    return `
+      <div class="asset-popover__body">
+        <div class="asset-popover__title-wrap">
+          <h3 class="asset-popover__title" id="asset-title">Flag Badge</h3>
+        </div>
+        <div class="asset-popover__flag-picker">
+          <input class="asset-popover__search" id="flag-search-input" type="search" value="${escapeHtml(assetModalState.flagSearch)}" placeholder="Search country or territory" autocomplete="off" />
+          <div class="asset-popover__flag-grid" id="flag-picker-grid">
+            ${buildFlagPickerResultsMarkup(editDraft)}
+          </div>
+        </div>
+        <div class="asset-popover__footer">
+          <button class="asset-popover__button asset-popover__button--ghost" type="button" data-asset-action="return-parent">Back</button>
         </div>
       </div>
     `;
@@ -1274,7 +1390,14 @@ function positionAssetPopover() {
   if (!popover || !panel || !popoverPanel) return;
   const panelRect = panel.getBoundingClientRect();
   const anchorRect = assetModalState.anchor;
-  const panelWidth = Math.min(360, panelRect.width - 32);
+  const preferredWidth = assetModalState.kind === 'cover-reposition'
+    ? 420
+    : assetModalState.kind === 'flag-picker'
+      ? 400
+      : assetModalState.kind === 'instagram'
+        ? 320
+        : 360;
+  const panelWidth = Math.min(preferredWidth, panelRect.width - 32);
   let left = anchorRect.left - panelRect.left + panel.scrollLeft;
   left = Math.max(16, Math.min(left, panel.scrollWidth - panelWidth - 16));
   const top = anchorRect.bottom - panelRect.top + panel.scrollTop + 10;
@@ -1284,17 +1407,27 @@ function positionAssetPopover() {
 }
 
 function updateCoverVisuals() {
-  const coverMedia = document.querySelector('.notion-cover__media');
-  if (coverMedia && editDraft) {
-    coverMedia.setAttribute('style', buildCoverStyle(editDraft));
+  const coverRoot = document.querySelector('.notion-cover');
+  if (coverRoot && editDraft) {
+    const shade = coverRoot.querySelector('.notion-cover__shade');
+    const toolbar = coverRoot.querySelector('.notion-cover__toolbar');
+    const currentMedia = coverRoot.querySelector('.notion-cover__media, .notion-cover__image');
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = buildCoverMediaMarkup(editDraft);
+    const nextMedia = wrapper.firstElementChild;
+    if (currentMedia && nextMedia) {
+      currentMedia.replaceWith(nextMedia);
+    } else if (nextMedia) {
+      coverRoot.insertBefore(nextMedia, shade || toolbar || coverRoot.firstChild);
+    }
   }
   const preview = document.querySelector('.asset-popover__cover-preview');
   if (preview && editDraft) {
-    preview.setAttribute('style', buildCoverStyle(editDraft));
+    preview.innerHTML = buildCoverMediaMarkup(editDraft, 'asset-popover__cover-media');
   }
 }
 
-function openAssetModal(kind, trigger, galleryIndex = null) {
+function openAssetModal(kind, trigger, galleryIndex = null, options = {}) {
   if (!editDraft || !trigger) return;
   syncDraftFromForm();
   assetModalState.open = true;
@@ -1303,7 +1436,8 @@ function openAssetModal(kind, trigger, galleryIndex = null) {
   assetModalState.tempPosition = editDraft.media.coverPosition ?? 50;
   assetModalState.anchor = trigger.getBoundingClientRect();
   assetModalState.urlTarget = '';
-  assetModalState.flagSearch = '';
+  assetModalState.flagSearch = kind === 'flag-picker' ? assetModalState.flagSearch : '';
+  assetModalState.parentKind = options.parentKind || '';
   document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
   document.getElementById('asset-modal').classList.add('open');
   document.getElementById('asset-modal').setAttribute('aria-hidden', 'false');
@@ -1317,6 +1451,7 @@ function closeAssetModal() {
   assetModalState.anchor = null;
   assetModalState.urlTarget = '';
   assetModalState.flagSearch = '';
+  assetModalState.parentKind = '';
   document.getElementById('asset-modal').classList.remove('open');
   document.getElementById('asset-modal').setAttribute('aria-hidden', 'true');
   document.getElementById('asset-modal-content').innerHTML = '';
@@ -1353,18 +1488,23 @@ async function applyAssetUrl() {
 async function applyAvatarAssets() {
   if (!editDraft) return;
   const avatarUrl = normalizeUrl(document.getElementById('asset-avatar-url-input')?.value.trim()) || '';
-  const flagUrl = normalizeUrl(document.getElementById('asset-flag-url-input')?.value.trim()) || '';
   try {
     if (avatarUrl) await loadImage(avatarUrl);
-    if (flagUrl) await loadImage(flagUrl);
   } catch (error) {
-    editStatus = 'One of the avatar image URLs could not be loaded.';
+    editStatus = 'The avatar image URL could not be loaded.';
     renderActiveProfile();
     return;
   }
   editDraft.media.avatarImage = avatarUrl || editDraft.media.avatarImage || '';
-  editDraft.media.flagImage = flagUrl || editDraft.media.flagImage || '';
   editStatus = 'Avatar updated.';
+  closeAssetModal();
+  renderActiveProfile();
+}
+
+function applyInstagramLink() {
+  if (!editDraft) return;
+  editDraft.social.instagram = normalizeUrl(document.getElementById('instagram-url-input')?.value.trim());
+  editStatus = editDraft.social.instagram ? 'Instagram link updated.' : 'Instagram link removed.';
   closeAssetModal();
   renderActiveProfile();
 }
@@ -1389,10 +1529,6 @@ async function handleFileUpload(files) {
   if (pendingUpload.kind === 'avatar') {
     editDraft.media.avatarImage = await optimizeImageFile(files[0], { maxWidth: 640, quality: 0.9 });
     editStatus = 'Avatar updated.';
-  }
-  if (pendingUpload.kind === 'flag') {
-    editDraft.media.flagImage = await optimizeImageFile(files[0], { maxWidth: 240, quality: 0.92 });
-    editStatus = 'Flag badge updated.';
   }
   if (pendingUpload.kind === 'gallery-add') {
     const images = [];
@@ -1420,7 +1556,6 @@ function triggerUpload(kind, index = null) {
   const map = {
     cover: 'cover-upload-input',
     avatar: 'avatar-upload-input',
-    flag: 'flag-upload-input',
     'gallery-add': 'gallery-upload-input',
     'gallery-change': 'gallery-upload-input',
     'beauty-image': 'beauty-image-upload-input'
@@ -1447,6 +1582,7 @@ function handleProfileContentClick(event) {
   if (action === 'cover-change') openAssetModal('cover-change', button);
   if (action === 'cover-reposition') openAssetModal('cover-reposition', button);
   if (action === 'avatar-change') openAssetModal('avatar', button);
+  if (action === 'instagram-edit') openAssetModal('instagram', button);
   if (action === 'gallery-add') openAssetModal('gallery-add', button);
   if (action.startsWith('gallery-change:')) openAssetModal('gallery-change', button, Number(action.split(':')[1]));
   if (action.startsWith('gallery-remove:')) {
@@ -1468,19 +1604,39 @@ async function handleAssetModalClick(event) {
   if (action === 'close') closeAssetModal();
   if (action === 'apply-url') await applyAssetUrl();
   if (action === 'apply-avatar') await applyAvatarAssets();
+  if (action === 'apply-instagram') applyInstagramLink();
   if (action === 'apply-reposition') applyCoverPosition();
+  if (action === 'open-flag-picker') {
+    assetModalState.flagSearch = '';
+    openAssetModal('flag-picker', button, null, { parentKind: 'avatar' });
+  }
+  if (action === 'return-parent') {
+    if (assetModalState.parentKind) {
+      assetModalState.kind = assetModalState.parentKind;
+      assetModalState.parentKind = '';
+      document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+      positionAssetPopover();
+      return;
+    }
+    closeAssetModal();
+  }
   if (action.startsWith('toggle-url:')) {
     assetModalState.urlTarget = assetModalState.urlTarget === action.split(':')[1] ? '' : action.split(':')[1];
     document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
     positionAssetPopover();
   }
   if (action.startsWith('select-flag:')) {
-    const selected = FLAG_GALLERY_OPTIONS.find(option => option.id === action.split(':')[1]);
+    const selected = getFlagLibraryOption(action.split(':')[1]);
     if (selected) {
-      editDraft.media.flagImage = selected.src;
-      editStatus = `${selected.country} flag selected.`;
-      document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
+      editDraft.media.flagCode = selected.code;
+      editDraft.media.flagImage = '';
+      editStatus = `${selected.name} flag selected.`;
       renderActiveProfile();
+      if (assetModalState.parentKind) {
+        assetModalState.kind = assetModalState.parentKind;
+        assetModalState.parentKind = '';
+      }
+      document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
       positionAssetPopover();
     }
   }
@@ -1491,7 +1647,6 @@ async function handleAssetModalClick(event) {
     if (assetModalState.kind === 'beauty-image') triggerUpload('beauty-image');
   }
   if (action === 'upload-avatar-image') triggerUpload('avatar');
-  if (action === 'upload-flag-image') triggerUpload('flag');
 }
 
 function handleAssetModalInput(event) {
@@ -1502,8 +1657,10 @@ function handleAssetModalInput(event) {
   }
   if (event.target.id === 'flag-search-input') {
     assetModalState.flagSearch = event.target.value || '';
-    document.getElementById('asset-modal-content').innerHTML = buildAssetModal();
-    positionAssetPopover();
+    const grid = document.getElementById('flag-picker-grid');
+    if (grid && editDraft) {
+      grid.innerHTML = buildFlagPickerResultsMarkup(editDraft);
+    }
   }
 }
 
@@ -1536,7 +1693,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('cover-upload-input').addEventListener('change', handleUploadInput);
   document.getElementById('avatar-upload-input').addEventListener('change', handleUploadInput);
-  document.getElementById('flag-upload-input').addEventListener('change', handleUploadInput);
   document.getElementById('gallery-upload-input').addEventListener('change', handleUploadInput);
   document.getElementById('beauty-image-upload-input').addEventListener('change', handleUploadInput);
 
@@ -1549,7 +1705,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('mousedown', event => {
     if (!assetModalState.open) return;
     const popover = document.getElementById('asset-panel');
-    const triggerZone = event.target.closest('[data-action="cover-change"], [data-action="cover-reposition"], [data-action="avatar-change"], [data-action="gallery-add"], [data-action^="gallery-change:"], [data-action="beauty-image"]');
+    const triggerZone = event.target.closest('[data-action="cover-change"], [data-action="cover-reposition"], [data-action="avatar-change"], [data-action="instagram-edit"], [data-action="gallery-add"], [data-action^="gallery-change:"], [data-action="beauty-image"]');
     if (popover?.contains(event.target) || triggerZone) return;
     closeAssetModal();
   });
